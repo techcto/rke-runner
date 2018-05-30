@@ -1,4 +1,5 @@
-import boto3,json,os,time
+import boto3,json,os,time,subprocess,base64
+
 ec2Client = boto3.client('ec2')
 autoscalingClient = boto3.client('autoscaling')
 snsClient = boto3.client('sns')
@@ -30,7 +31,48 @@ def checkEc2s(asgName):
     print("Active EC2s: ",activeEc2s)
     return pendingEc2s
 
-def generateRKEConfig(asgName, instanceUser, keyName, FQDN):
+def generateCertificates(FQDN):
+    #Create CA Signing Authority
+    openssl req \
+        -new \
+        -newkey rsa:4096 \
+        -days 365 \
+        -nodes \
+        -x509 \
+        -subj "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com" \
+        -keyout ca.key \
+        -out ca.crt
+
+    #Create Certificate
+    openssl req \
+        -new \
+        -newkey rsa:4096 \
+        -days 365 \
+        -nodes \
+        -subj "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN+ "" \
+        -keyout server.key \
+        -out server.csr
+
+    #Sign the certificate from the CA
+    openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+
+    rkeCrts=[]
+
+    //read cert file
+    with open("server.crt", "rb") as crt:
+        rkeCrts['crt'] = base64.b64encode(crt.read())
+
+    //read key file
+    with open("server.key", "rb") as key:
+        rkeCrts['key'] = base64.b64encode(key.read())
+
+    //read ca file
+    with open("ca.crt", "rb") as ca:
+        rkeCrts['ca'] = base64.b64encode(ca.read())
+
+    return rkeCrts
+
+def generateRKEConfig(asgName, instanceUser, keyName, FQDN, rkeCrts):
     filters = [{  
     'Name': 'tag:aws:autoscaling:groupName',
     'Values': [asgName]
@@ -79,6 +121,25 @@ def generateRKEConfig(asgName, instanceUser, keyName, FQDN):
             '    kind: ClusterRole.\n'
             '    name: cluster-admin.\n'
             '    apiGroup: rbac.authorization.k8s.io.\n'
+            '---.\n'
+            'apiVersion: v1.\n'
+            'kind: Secret.\n'
+            'metadata:.\n'
+            '    name: cattle-keys-ingress.\n'
+            '    namespace: cattle-system.\n'
+            'type: Opaque.\n'
+            'data:.\n'
+            '    tls.crt: ' + rkeCrts['crt'] + '.\n'
+            '    tls.key: ' + rkeCrts['key'] + '.\n'
+            '---.\n'
+            'apiVersion: v1.\n'
+            'kind: Secret.\n'
+            'metadata:.\n'
+            '    name: cattle-keys-server.\n'
+            '    namespace: cattle-system.\n'
+            'type: Opaque.\n'
+            'data:.\n'
+            '    cacerts.pem: ' + rkeCrts['ca'] + '.\n'
             '---.\n'
             'apiVersion: v1.\n'
             'kind: Service.\n'
@@ -171,7 +232,8 @@ def lambda_handler(event, context):
 
     pendingEc2s=checkEc2s(asgName);
     if pendingEc2s==0:
-        rkeConfig = generateRKEConfig(asgName,instanceUser,keyName)
+        rkeCrts = generateCertificates(FQDN)
+        rkeConfig = generateRKEConfig(asgName,instanceUser,keyName,rkeCrts)
         print("RKE Config:")
         print(rkeConfig)
         try:
