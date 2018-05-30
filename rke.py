@@ -217,7 +217,7 @@ def generateRKEConfig(asgName, instanceUser, keyName, FQDN, rkeCrts):
             ' .\n')
     return rkeConfig
 
-def lambda_handler(event, context):
+def run(event, context):
     instanceUser=os.environ['InstanceUser']
     keyName=os.environ['KeyName']
     FQDN=os.environ['FQDN']
