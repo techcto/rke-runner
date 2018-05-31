@@ -5,11 +5,9 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Compiling the Python code...
-      - apt-get install zip -y
   post_build:
     commands:
-      - zip -r S3InitRKE.zip *
       - echo Build completed on `date`
 artifacts:
   files:
-    - 'S3InitRKE.zip'
+    - '**/*'
