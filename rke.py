@@ -33,40 +33,40 @@ def checkEc2s(asgName):
 
 def generateCertificates(FQDN):
     #Create CA Signing Authority
-    openssl req \
+    subprocess.call("openssl req \
         -new \
         -newkey rsa:4096 \
         -days 365 \
         -nodes \
         -x509 \
-        -subj "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com" \
+        -subj '/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com' \
         -keyout ca.key \
-        -out ca.crt
+        -out ca.crt", shell=True)
 
     #Create Certificate
-    openssl req \
+    subprocess.call("openssl req \
         -new \
         -newkey rsa:4096 \
         -days 365 \
         -nodes \
-        -subj "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN+ "" \
+        -subj '/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=' +FQDN+ '' \
         -keyout server.key \
-        -out server.csr
+        -out server.csr", shell=True)
 
     #Sign the certificate from the CA
-    openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+    subprocess.call("openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt", shell=True)
 
     rkeCrts=[]
 
-    //read cert file
+    #read cert file
     with open("server.crt", "rb") as crt:
         rkeCrts['crt'] = base64.b64encode(crt.read())
 
-    //read key file
+    #read key file
     with open("server.key", "rb") as key:
         rkeCrts['key'] = base64.b64encode(key.read())
 
-    //read ca file
+    #read ca file
     with open("ca.crt", "rb") as ca:
         rkeCrts['ca'] = base64.b64encode(ca.read())
 
