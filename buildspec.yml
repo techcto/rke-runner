@@ -5,9 +5,10 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Compiling the Python code...
+      - yum install -y zip 
   post_build:
     commands:
-      - zip -r S3InitRKE.zip . **
+      - zip -r S3InitRKE.zip *
       - echo Build completed on `date`
 artifacts:
   files:
