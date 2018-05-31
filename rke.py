@@ -222,13 +222,18 @@ def run(event, context):
     keyName=os.environ['KeyName']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
+    stackStatus = ""
 
     snsTopicArn=event['Records'][0]['Sns']['TopicArn']
     snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
 
-    lifecycleHookName=snsMessage['LifecycleHookName']
-    lifecycleActionToken=snsMessage['LifecycleActionToken']
-    asgName=snsMessage['AutoScalingGroupName']
+    if snsMessage['LifecycleHookName'] is None:
+        stackStatus = "pending"
+
+    if stackStatus != "pending":
+        lifecycleHookName=snsMessage['LifecycleHookName']
+        lifecycleActionToken=snsMessage['LifecycleActionToken']
+        asgName=snsMessage['AutoScalingGroupName']
 
     pendingEc2s=checkEc2s(asgName);
     if pendingEc2s==0:
@@ -239,9 +244,11 @@ def run(event, context):
         try:
             encoded_payload = rkeConfig.encode("utf-8")
             s3Client.Bucket(rkeS3Bucket).put_object(Key=config.yaml, Body=encoded_payload)
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            if stackStatus != "pending":
+                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
         except BaseException as e:
             print(str(e))
     elif pendingEc2s>=1:
         time.sleep(5)
-        publishSNSMessage(snsMessage,snsTopicArn)
+        if stackStatus != "pending":
+            publishSNSMessage(snsMessage,snsTopicArn)
