@@ -7,7 +7,8 @@ phases:
       - echo Compiling the Python code...
   post_build:
     commands:
+      - zip -r S3InitRKE.zip . **
       - echo Build completed on `date`
 artifacts:
   files:
-    - '**/*'
+    - 'S3InitRKE.zip'
