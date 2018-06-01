@@ -257,7 +257,7 @@ def run(event, context):
             try:
                 print("Run RKE")
                 subprocess.check_call(["chmod", "700", "rke"]])
-                subprocess.check_call(["rke", "up", "--config", "config.yaml"]])
+                subprocess.check_call(["rke", "up", "--config", "/tmp/config.yaml"]])
 
             try:
                 print("Complete Lifecycle Event")
