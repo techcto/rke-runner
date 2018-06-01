@@ -259,9 +259,11 @@ def run(event, context):
                 subprocess.check_call(["chmod", "700", "rke"])
                 subprocess.check_call(["rke", "up", "--config", "/tmp/config.yaml"])
 
-            try:
-                print("Complete Lifecycle Event")
-                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+                try:
+                    print("Complete Lifecycle Event")
+                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+                except BaseException as e:
+                    print(str(e))
             except BaseException as e:
                 print(str(e))
         except BaseException as e:
