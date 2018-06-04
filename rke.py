@@ -30,7 +30,7 @@ def _init_bin(executable_name):
     print(copyResult)
 
     print("Giving new binaries permissions for lambda")
-    os.chmod(newfile, 0775)
+    os.chmod(newfile, 0o755)
     elapsed = (time.clock() - start)
     print(executable_name+" ready in "+str(elapsed)+'s.')
 
