@@ -270,6 +270,7 @@ def run(event, context):
 
     if pendingEc2s==0:
         print("Create RKE config")
+        #Download rke crts from S3
         rkeCrts = generateCertificates(FQDN)
         generateRKEConfig(asgName,instanceUser,instanceCRT,FQDN,rkeCrts)
 
