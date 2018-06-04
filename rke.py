@@ -1,4 +1,4 @@
-import boto3,json,os,time,subprocess,base64
+import boto3,json,os,time,subprocess,base64,shutil
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -6,10 +6,30 @@ autoscalingClient = boto3.client('autoscaling')
 snsClient = boto3.client('sns')
 lambdaClient = boto3.client('lambda')
 
+LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
+CURR_BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
+LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
+### In order to get permissions right, we have to copy them to /tmp
+BIN_DIR = '/tmp/bin'
 OPENSSL = '/usr/bin/openssl'
 
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
+
+# This is necessary as we don't have permissions in /var/tasks/bin where the lambda function is running
+def _init_bin(executable_name):
+    start = time.clock()
+    if not os.path.exists(BIN_DIR):
+        print("Creating bin folder")
+        os.makedirs(BIN_DIR)
+    print("Copying binaries for "+executable_name+" in /tmp/bin")
+    currfile = os.path.join(CURR_BIN_DIR, executable_name)
+    newfile  = os.path.join(BIN_DIR, executable_name)
+    shutil.copy2(currfile, newfile)
+    print("Giving new binaries permissions for lambda")
+    os.chmod(newfile, 0775)
+    elapsed = (time.clock() - start)
+    print(executable_name+" ready in "+str(elapsed)+'s.')
 
 def openssl(*args):
     cmdline = [OPENSSL] + list(args)
@@ -256,7 +276,9 @@ def run(event, context):
 
             try:
                 print("Run RKE")
-                subprocess.check_call("./rke up --config /tmp/config.yaml", shell=True)
+                _init_bin('rke')
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
                 try:
                     print("Complete Lifecycle Event")
