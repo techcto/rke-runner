@@ -5,6 +5,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Compiling the Python code...
+      - apt-get update -y
       - apt-get -y install zip
   post_build:
     commands:
