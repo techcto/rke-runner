@@ -27,7 +27,8 @@ def _init_bin(executable_name):
     print("Copying binaries for "+executable_name+" in /tmp/bin")
     currfile = os.path.join(CURR_BIN_DIR, executable_name)
     newfile  = os.path.join(BIN_DIR, executable_name)
-    shutil.copy2(currfile, newfile)
+    copyResult = shutil.copyfile(currfile, newfile)
+    print(copyResult)
 
     print("Giving new binaries permissions for lambda")
     os.chmod(newfile, 0775)
