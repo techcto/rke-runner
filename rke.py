@@ -7,7 +7,6 @@ snsClient = boto3.client('sns')
 lambdaClient = boto3.client('lambda')
 
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
-CURR_BIN_DIR = os.path.join(LAMBDA_TASK_ROOT, 'bin')
 LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 ### In order to get permissions right, we have to copy them to /tmp
 BIN_DIR = '/tmp/bin'
@@ -25,7 +24,7 @@ def _init_bin(executable_name):
         os.makedirs(BIN_DIR)
 
     print("Copying binaries for "+executable_name+" in /tmp/bin")
-    currfile = os.path.join(CURR_BIN_DIR, executable_name)
+    currfile = os.path.join(LAMBDA_TASK_ROOT, executable_name)
     newfile  = os.path.join(BIN_DIR, executable_name)
     copyResult = shutil.copyfile(currfile, newfile)
     print(copyResult)
