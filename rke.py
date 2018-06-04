@@ -91,7 +91,7 @@ def generateCertificates(FQDN):
 
     return rkeCrts
 
-def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
+def generateRKEConfig(asgName, instanceUser, instanceCRT, FQDN, rkeCrts):
     print("FQDN: " + FQDN)
     filters = [{  
     'Name': 'tag:aws:autoscaling:groupName',
@@ -111,7 +111,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key: ' + str(instancePEM) + '\n')
+                                '   ssh_key: ' + str(instanceCRT) + '\n')
 
     rkeConfig += ('\n'
     'addons: |-\n'
@@ -252,7 +252,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
 
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
-    instancePEM=os.environ['instancePEM']
+    instanceCRT=os.environ['instanceCRT']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
@@ -271,7 +271,7 @@ def run(event, context):
     if pendingEc2s==0:
         print("Create RKE config")
         rkeCrts = generateCertificates(FQDN)
-        generateRKEConfig(asgName,instanceUser,instancePEM,FQDN,rkeCrts)
+        generateRKEConfig(asgName,instanceUser,instanceCRT,FQDN,rkeCrts)
 
         try:
             print("Upload RKE config to S3")
