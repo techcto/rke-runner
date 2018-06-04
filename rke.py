@@ -266,9 +266,10 @@ def run(event, context):
     pendingEc2s=checkEc2s(asgName);
 
     if pendingEc2s==0:
-        rkeCrts = generateCertificates(FQDN)
         print("Create RKE config")
+        rkeCrts = generateCertificates(FQDN)
         generateRKEConfig(asgName,instanceUser,keyName,FQDN,rkeCrts)
+
         try:
             print("Upload RKE config to S3")
             s3 = boto3.resource('s3')
