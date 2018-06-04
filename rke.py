@@ -282,6 +282,7 @@ def run(event, context):
                 print("Run RKE")
                 _init_bin('rke')
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+                print(cmdline)
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
                 try:
