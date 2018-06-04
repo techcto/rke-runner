@@ -91,7 +91,7 @@ def generateCertificates(FQDN):
 
     return rkeCrts
 
-def generateRKEConfig(asgName, instanceUser, keyName, FQDN, rkeCrts):
+def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
     print("FQDN: " + FQDN)
     filters = [{  
     'Name': 'tag:aws:autoscaling:groupName',
@@ -111,7 +111,7 @@ def generateRKEConfig(asgName, instanceUser, keyName, FQDN, rkeCrts):
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key_path: ' + keyName + '\n')
+                                '   ssh_key: ' + str(instancePEM) + '\n')
 
     rkeConfig += ('\n'
     'addons: |-\n'
@@ -252,7 +252,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
 
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
-    keyName=os.environ['KeyName']
+    instancePEM=os.environ['instancePEM']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
@@ -271,7 +271,7 @@ def run(event, context):
     if pendingEc2s==0:
         print("Create RKE config")
         rkeCrts = generateCertificates(FQDN)
-        generateRKEConfig(asgName,instanceUser,keyName,FQDN,rkeCrts)
+        generateRKEConfig(asgName,instanceUser,instancePEM,FQDN,rkeCrts)
 
         try:
             print("Upload RKE config to S3")
@@ -279,11 +279,14 @@ def run(event, context):
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
             try:
+                #Download rke files from S3
+                
                 print("Run RKE")
                 _init_bin('rke')
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-                print(cmdline)
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+
+                #Upload rke files to S3
 
                 try:
                     print("Complete Lifecycle Event")
