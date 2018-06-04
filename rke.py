@@ -220,7 +220,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
     if list(path_prefix)[-1] is not '/':
         path_prefix += '/'
 
-    # check if 'Contents' key exist in response dict - if it exist it indicate the folder exists, otherwise response will be None
+    # check if 'Contents' key exist in response dict - if it exist it indicate the folder exists, otherwise response will be None.
     response = client.list_objects_v2(Bucket=bucket, Prefix=path_prefix).get('Contents')
 
     if response:
