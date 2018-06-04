@@ -17,19 +17,22 @@ def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
 
 # This is necessary as we don't have permissions in /var/tasks/bin where the lambda function is running
-# def _init_bin(executable_name):
-#     start = time.clock()
-#     if not os.path.exists(BIN_DIR):
-#         print("Creating bin folder")
-#         os.makedirs(BIN_DIR)
-#     print("Copying binaries for "+executable_name+" in /tmp/bin")
-#     currfile = os.path.join(CURR_BIN_DIR, executable_name)
-#     newfile  = os.path.join(BIN_DIR, executable_name)
-#     shutil.copy2(currfile, newfile)
-#     print("Giving new binaries permissions for lambda")
-#     os.chmod(newfile, 0775)
-#     elapsed = (time.clock() - start)
-#     print(executable_name+" ready in "+str(elapsed)+'s.')
+def _init_bin(executable_name):
+    start = time.clock()
+
+    if not os.path.exists(BIN_DIR):
+        print("Creating bin folder")
+        os.makedirs(BIN_DIR)
+
+    print("Copying binaries for "+executable_name+" in /tmp/bin")
+    currfile = os.path.join(CURR_BIN_DIR, executable_name)
+    newfile  = os.path.join(BIN_DIR, executable_name)
+    shutil.copy2(currfile, newfile)
+
+    print("Giving new binaries permissions for lambda")
+    os.chmod(newfile, 0775)
+    elapsed = (time.clock() - start)
+    print(executable_name+" ready in "+str(elapsed)+'s.')
 
 def openssl(*args):
     cmdline = [OPENSSL] + list(args)
@@ -277,9 +280,9 @@ def run(event, context):
 
             try:
                 print("Run RKE")
-                # _init_bin('rke')
-                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+                _init_bin('rke')
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
                 try:
                     print("Complete Lifecycle Event")
