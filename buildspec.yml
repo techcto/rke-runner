@@ -5,7 +5,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Compiling the Python code...
-      - yum -y install zip
+      - apt-get -y install zip
   post_build:
     commands:
       - zip -r S3initRKE.zip .
