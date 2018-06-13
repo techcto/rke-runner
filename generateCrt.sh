@@ -1,3 +1,11 @@
+#Create EC2 Key Pair
+openssl genrsa -passout pass:x -des3 -out /tmp/private.pem 2048
+openssl rsa -passin pass:x -in /tmp/private.pem -outform PEM -pubout -out /tmp/public.pem
+openssl rsa -passin pass:x -in /tmp/private.pem -RSAPublicKey_out -out /tmp/rsa.pem
+
+chmod 600 /tmp/private.pem
+ssh-keygen -y -P "x" -f /tmp/private.pem > /tmp/rsa.pub
+   
 #Create CA Signing Authority
 openssl req \
     -new \
