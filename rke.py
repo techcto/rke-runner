@@ -111,7 +111,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key: ' + base64.b64encode(instancePEM.encode("utf-8")) + '\n')
+                                '   ssh_key: ' + base64.b64encode(str(instancePEM.encode("utf-8"))) + '\n')
 
     rkeConfig += ('\n'
     'addons: |-\n'
