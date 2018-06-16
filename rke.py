@@ -111,8 +111,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key:  |-\n'
-                                '   ' + str(instancePEM) + '\n')
+                                '   ssh_key: ' + instancePEM.decode('utf8') + '\n')
 
     rkeConfig += ('\n'
     'addons: |-\n'
@@ -149,8 +148,8 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
     '       namespace: cattle-system\n'
     '   type: Opaque\n'
     '   data:\n'
-    '       tls.crt: ' + str(rkeCrts['crt']) + '\n'
-    '       tls.key: ' + str(rkeCrts['key']) + '\n'
+    '       tls.crt: ' + rkeCrts['crt'].decode('utf8') + '\n'
+    '       tls.key: ' + rkeCrts['key'].decode('utf8') + '\n'
     '   ---\n'
     '   apiVersion: v1\n'
     '   kind: Secret\n'
@@ -159,7 +158,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
     '       namespace: cattle-system\n'
     '   type: Opaque\n'
     '   data:\n'
-    '       cacerts.pem: ' + str(rkeCrts['ca']) + '\n'
+    '       cacerts.pem: ' + rkeCrts['ca'].decode('utf8') + '\n'
     '   ---\n'
     '   apiVersion: v1\n'
     '   kind: Service\n'
@@ -254,7 +253,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
     instancePEM=os.environ['instancePEM']
-    #instancePEM=base64.b64encode(instancePEM.encode())
+    instancePEM=base64.b64encode(instancePEM.encode())
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
