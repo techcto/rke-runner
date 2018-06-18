@@ -114,7 +114,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
                                 '   ssh_key: |-' + 
-                                '       ' + instancePEM.decode('utf8') + '\n')
+                                '       ' + instancePEM + '\n')
 
     rkeConfig += ('\n'
     'addons: |-\n'
@@ -256,7 +256,6 @@ def bucket_folder_exists(client, bucket, path_prefix):
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
     instancePEM=os.environ['instancePEM']
-    instancePEM.encode()
     # instancePEM=base64.b64encode(instancePEM.encode())
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
