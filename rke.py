@@ -106,14 +106,14 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 'nodes:\n')
 
     print(ec2ContainerInstances['Reservations'])
-    for i in range(len(ec2ContainerInstances['Reservations'])):
+    for i in range(len(ec2ContainerInstances['Reservations'])+1):
         print("i=" + str(i))
         instance = ec2ContainerInstances['Reservations'][i]['Instances'][0]
         if instance['State']['Name'] == 'running':
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key: |-' + 
+                                '   ssh_key: |- \n'
                                 '       ' + instancePEM + '\n')
 
     rkeConfig += ('\n'
