@@ -105,7 +105,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
-    for i in range(len(ec2ContainerInstances['Reservations'])):
+    for i in xrange(len(ec2ContainerInstances['Reservations'])):
         instance = ec2ContainerInstances['Reservations'][i]['Instances'][0]
         if instance['State']['Name'] == 'running':
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
