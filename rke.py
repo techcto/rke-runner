@@ -91,6 +91,12 @@ def generateCertificates(FQDN):
 
     return rkeCrts
 
+def reindent(s, numSpaces):
+    leading_space = numSpaces * ' '
+    lines = [ leading_space + line.strip( )
+              for line in s.splitlines( ) ]
+    return '\n'.join(lines)
+
 def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
     print("FQDN: " + FQDN)
     filters = [{  
@@ -113,8 +119,9 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
             rkeConfig += (' - address: ' + instance['PublicIpAddress'] + '\n'
                                 '   user: ' + instanceUser + '\n'
                                 '   role: [controlplane,etcd,worker]\n'
-                                '   ssh_key: |- \n'
-                                '       ' + instancePEM + '\n')
+                                '   ssh_key: |- \n')
+            rkeConfig += reindent(instancePEM, 8)
+            rkeConfig += '\n'
 
     rkeConfig += ('\n'
     'addons: |-\n'
