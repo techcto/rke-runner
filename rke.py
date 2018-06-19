@@ -60,6 +60,13 @@ def checkEc2s(asgName):
     print("Active EC2s: ",activeEc2s)
     return pendingEc2s
 
+def _key_existing_size__head(client, bucket, key):
+    try:
+        obj = client.head_object(Bucket=bucket, Key=key)
+        return obj['ContentLength']
+    except BaseException as e:
+            print(str(e))
+
 def generateCertificates(FQDN):
     #Create CA Signing Authority
     os.environ['HOME'] = '/tmp'
@@ -67,10 +74,9 @@ def generateCertificates(FQDN):
     openssl("version")
     s3 = boto3.resource('s3')
 
-    #Test if cerst have been generated and uploaded to s3
-    bucket = s3.Bucket(rkeS3Bucket)
-    serverCrt = list(bucket.objects.filter(Prefix="server.crt"))
-    if len(serverCrt) > 0 and serverCrt[0].key == key:
+    #Test if certs have been generated and uploaded to s3
+    serverLength = _key_existing_size__head(s3, rkeS3Bucket, 'server.crt')
+    if serverLength > 0:
         s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
         s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
         s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
