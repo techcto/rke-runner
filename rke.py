@@ -1,4 +1,5 @@
-import boto3,json,os,time,subprocess,base64,shutil,cfnresponse
+import boto3,json,os,time,subprocess,base64,shutil
+import cfnresponse
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -300,9 +301,7 @@ def run(event, context):
                     response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 except BaseException as e:
                     print(str(e))
-
-                    #Submit to CF for completion
-                    responseData['status'] = "success"
+                     responseData['status'] = "success"
                     try:
                         cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
                     except BaseException as e:
