@@ -63,17 +63,34 @@ def checkEc2s(asgName):
 def generateCertificates(FQDN):
     #Create CA Signing Authority
     os.environ['HOME'] = '/tmp'
-
     openssl("version")
-    
-    #Create CA
-    openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
+    s3 = boto3.resource('s3')
 
-    #Create Certificate
-    openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN, "-keyout", "/tmp/server.key", "-out", "/tmp/server.csr")
+    #Test if cerst have been generated and uploaded to s3
+    serverCrt = list(bucket.objects.filter(Prefix="server.crt"))
+    if len(serverCrt) > 0 and serverCrt[0].key == key:
+        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
+        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
+        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
+        
+    else:
+        #Create CA
+        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
 
-    #Sign the certificate from the CA
-    openssl("x509", "-req", "-days", "3650", "-in", "/tmp/server.csr", "-CA", "/tmp/ca.crt", "-CAkey", "/tmp/ca.key", "-set_serial", "01", "-out", "/tmp/server.crt")
+        #Create Certificate
+        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN, "-keyout", "/tmp/server.key", "-out", "/tmp/server.csr")
+
+        #Sign the certificate from the CA
+        openssl("x509", "-req", "-days", "3650", "-in", "/tmp/server.csr", "-CA", "/tmp/ca.crt", "-CAkey", "/tmp/ca.key", "-set_serial", "01", "-out", "/tmp/server.crt")
+
+        #Upload certs to s3
+        try:
+            print("Upload certs to S3")
+            s3.meta.client.upload_file('/tmp/server.crt', rkeS3Bucket, 'server.crt')
+            s3.meta.client.upload_file('/tmp/server.key', rkeS3Bucket, 'server.key')
+            s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
+        except BaseException as e:
+            print(str(e))
 
     rkeCrts={}
 
@@ -297,10 +314,12 @@ def run(event, context):
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
                 try:
+                    #If Lambda executed from Lifecycle Event, issue success command
                     print("Complete Lifecycle Event")
                     response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 except BaseException as e:
                     print(str(e))
+                    #Else if executed from Cloudformation or elsewhere, return true.
                     responseData['status'] = "success"
                     try:
                         return True
@@ -309,8 +328,10 @@ def run(event, context):
                         return False
             except BaseException as e:
                 print(str(e))
+                publishSNSMessage(snsMessage,snsTopicArn)
         except BaseException as e:
             print(str(e))
+            return False
     elif pendingEc2s>=1:
         time.sleep(5)
         try:
