@@ -1,5 +1,4 @@
 import boto3,json,os,time,subprocess,base64,shutil
-import cfnresponse
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -304,9 +303,11 @@ def run(event, context):
                     print(str(e))
                     responseData['status'] = "success"
                     try:
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                        response = send(event, context, SUCCESS, {}, None)
+                        return True
                     except BaseException as e:
                         print(str(e))
+                        return False
             except BaseException as e:
                 print(str(e))
         except BaseException as e:
