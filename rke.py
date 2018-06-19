@@ -63,10 +63,12 @@ def checkEc2s(asgName):
 def generateCertificates(FQDN):
     #Create CA Signing Authority
     os.environ['HOME'] = '/tmp'
+    rkeS3Bucket=os.environ['rkeS3Bucket']
     openssl("version")
     s3 = boto3.resource('s3')
 
     #Test if cerst have been generated and uploaded to s3
+    bucket = s3.Bucket(rkeS3Bucket)
     serverCrt = list(bucket.objects.filter(Prefix="server.crt"))
     if len(serverCrt) > 0 and serverCrt[0].key == key:
         s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
@@ -280,7 +282,6 @@ def bucket_folder_exists(client, bucket, path_prefix):
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
     instancePEM=os.environ['instancePEM']
-    # instancePEM=base64.b64encode(instancePEM.encode())
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
@@ -296,6 +297,7 @@ def run(event, context):
     except BaseException as e:
         print(str(e))
 
+    #Test if all ec2s in ASG are ready
     pendingEc2s=checkEc2s(asgName);
 
     if pendingEc2s==0:
