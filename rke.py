@@ -1,4 +1,4 @@
-import boto3,json,os,time,subprocess,base64,shutil
+import boto3,json,os,time,subprocess,base64,shutil,cfnresponse
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -269,6 +269,7 @@ def run(event, context):
     asgName=os.environ['CLUSTER']
     pendingEc2s=0
 
+    #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Manually)
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
@@ -290,20 +291,22 @@ def run(event, context):
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
             try:
-                #Download rke files from S3
-                
                 print("Run RKE")
                 _init_bin('rke')
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
-
-                #Upload rke files to S3
-
                 try:
                     print("Complete Lifecycle Event")
                     response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 except BaseException as e:
                     print(str(e))
+
+                    #Submit to CF for completion
+                    responseData['status'] = "success"
+                    try:
+                        cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                    except BaseException as e:
+                        print(str(e))
             except BaseException as e:
                 print(str(e))
         except BaseException as e:
