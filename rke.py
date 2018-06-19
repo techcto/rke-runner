@@ -269,6 +269,7 @@ def run(event, context):
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
     pendingEc2s=0
+    responseData = {}
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Manually)
     try:
@@ -301,7 +302,7 @@ def run(event, context):
                     response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 except BaseException as e:
                     print(str(e))
-                     responseData['status'] = "success"
+                    responseData['status'] = "success"
                     try:
                         cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
                     except BaseException as e:
