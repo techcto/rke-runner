@@ -303,7 +303,6 @@ def run(event, context):
                     print(str(e))
                     responseData['status'] = "success"
                     try:
-                        response = send(event, context, SUCCESS, {}, None)
                         return True
                     except BaseException as e:
                         print(str(e))
