@@ -75,7 +75,7 @@ def generateCertificates(FQDN):
     s3 = boto3.resource('s3')
 
     #Test if certs have been generated and uploaded to s3
-    serverLength = _key_existing_size__head(s3, rkeS3Bucket, 'server.crt')
+    serverLength = _key_existing_size__head(s3.meta.client, rkeS3Bucket, 'server.crt')
     if serverLength > 0:
         s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
         s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
