@@ -74,14 +74,11 @@ def generateCertificates(FQDN):
     openssl("version")
     s3 = boto3.resource('s3')
 
-    #Test if certs have been generated and uploaded to s3
-    serverLength = _key_existing_size__head(s3.meta.client, rkeS3Bucket, 'server.crt')
-    if serverLength > 0:
-        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
-        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
-        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
-        
-    else:
+    try:
+        s3.Object(rkeS3Bucket, 'server.crt').load()
+    except botocore.exceptions.ClientError as e:
+        print("The certs do not exist")
+
         #Create CA
         openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
 
@@ -99,6 +96,10 @@ def generateCertificates(FQDN):
             s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
         except BaseException as e:
             print(str(e))
+    else:
+        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
+        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
+        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
 
     rkeCrts={}
 
