@@ -76,7 +76,7 @@ def generateCertificates(FQDN):
 
     try:
         s3.Object(rkeS3Bucket, 'server.crt').load()
-    except botocore.exceptions.ClientError as e:
+    except BaseException as e:
         print("The certs do not exist")
 
         #Create CA
