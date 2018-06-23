@@ -366,7 +366,7 @@ def run(event, context):
                     #Else if executed from Cloudformation or elsewhere, return true.
                     responseData['status'] = "success"
                     try:
-                        send(event, context, cfnresponse.SUCCESS, responseData)
+                        send(event, context, SUCCESS, responseData)
                     except BaseException as e:
                         print(str(e))
                         return False
