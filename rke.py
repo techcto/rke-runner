@@ -1,4 +1,5 @@
 import boto3,json,os,time,subprocess,base64,shutil
+import cfnresponse
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -331,7 +332,7 @@ def run(event, context):
                     #Else if executed from Cloudformation or elsewhere, return true.
                     responseData['status'] = "success"
                     try:
-                        return True
+                        cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
                     except BaseException as e:
                         print(str(e))
                         return False
