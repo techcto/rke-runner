@@ -1,5 +1,5 @@
 import boto3,json,os,time,subprocess,base64,shutil
-import cfnresponse
+from botocore.vendored import requests
 from io import StringIO
 
 ec2Client = boto3.client('ec2')
@@ -12,6 +12,8 @@ LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 ### In order to get permissions right, we have to copy them to /tmp
 BIN_DIR = '/tmp/bin'
 OPENSSL = '/usr/bin/openssl'
+SUCCESS = "SUCCESS"
+FAILED = "FAILED"
 
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
@@ -287,6 +289,38 @@ def bucket_folder_exists(client, bucket, path_prefix):
         return True
     return False
 
+def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+    responseUrl = event['ResponseURL']
+
+    print(responseUrl)
+
+    responseBody = {}
+    responseBody['Status'] = responseStatus
+    responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
+    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
+    responseBody['StackId'] = event['StackId']
+    responseBody['RequestId'] = event['RequestId']
+    responseBody['LogicalResourceId'] = event['LogicalResourceId']
+    responseBody['NoEcho'] = noEcho
+    responseBody['Data'] = responseData
+
+    json_responseBody = json.dumps(responseBody)
+
+    print("Response body:\n" + json_responseBody)
+
+    headers = {
+        'content-type' : '',
+        'content-length' : str(len(json_responseBody))
+    }
+
+    try:
+        response = requests.put(responseUrl,
+                                data=json_responseBody,
+                                headers=headers)
+        print("Status code: " + response.reason)
+    except Exception as e:
+        print("send(..) failed executing requests.put(..): " + str(e))
+
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
     instancePEM=os.environ['instancePEM']
@@ -332,7 +366,7 @@ def run(event, context):
                     #Else if executed from Cloudformation or elsewhere, return true.
                     responseData['status'] = "success"
                     try:
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+                        send(event, context, cfnresponse.SUCCESS, responseData)
                     except BaseException as e:
                         print(str(e))
                         return False
