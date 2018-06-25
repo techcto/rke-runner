@@ -330,9 +330,9 @@ def run(event, context):
 
     #Download Instance RSA Key from S3
     s3 = boto3.resource('s3')
-    s3.meta.client.download_file(rkeS3Bucket, 'private.pem', '/tmp/private.pem')
-    with open("/tmp/private.pem", "rb") as private:
-        instancePEM = private.read().decode("utf-8")
+    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
+    with open("/tmp/rsa.pem", "rb") as rsa:
+        instancePEM = rsa.read().decode("utf-8")
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Manually)
     try:
