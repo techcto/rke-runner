@@ -374,13 +374,16 @@ def run(event, context):
                         print(str(e))
                         return False
             except BaseException as e:
+                print("Something went wrong!  Wait 15 seconds and try again.")
+                time.sleep(15)
                 print(str(e))
                 publishSNSMessage(snsMessage,snsTopicArn)
         except BaseException as e:
             print(str(e))
             return False
     elif pendingEc2s>=1:
-        time.sleep(5)
+        print("Servers are not ready!  Wait 15 seconds and try again.")
+        time.sleep(15)
         try:
             publishSNSMessage(snsMessage,snsTopicArn)
         except BaseException as e:
