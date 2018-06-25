@@ -139,6 +139,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
+
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
@@ -321,12 +322,17 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
 
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
-    instancePEM=os.environ['instancePEM']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
     pendingEc2s=0
     responseData = {}
+
+    #Download Instance RSA Key from S3
+    s3 = boto3.resource('s3')
+    s3.meta.client.download_file(rkeS3Bucket, 'private.pem', '/tmp/private.pem')
+    with open("/tmp/private.pem", "rb") as private:
+        instancePEM = private.read().decode("utf-8")
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Manually)
     try:
@@ -347,7 +353,6 @@ def run(event, context):
 
         try:
             print("Upload RKE config to S3")
-            s3 = boto3.resource('s3')
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
             try:
