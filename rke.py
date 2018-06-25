@@ -46,20 +46,20 @@ def checkEc2s(asgName):
     'Name': 'tag:aws:autoscaling:groupName',
     'Values': [asgName]
     }]
-    ec2ContainerInstances = ec2Client.describe_instances(Filters=filters)
-    print(str(ec2ContainerInstances))
     pendingEc2s = 0
     activeEc2s = 0
-    for i in range(len(ec2ContainerInstances['Reservations'])):
-        instance = ec2ContainerInstances['Reservations'][i]['Instances'][0]
-        print(str(instance['State']['Name']))
-        print(str(instance))
-        if instance['State']['Name'] == 'disabling':
-            pendingEc2s = pendingEc2s + 1
-        elif instance['State']['Name'] == 'pending':
-            pendingEc2s = pendingEc2s + 1
-        elif instance['State']['Name'] == 'running':
-            activeEc2s = activeEc2s + 1
+
+    for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
+        print(reservation['Instances'])
+        for instance in reservation['Instances']:
+            print(str(instance['State']['Name']))
+            print(str(instance))
+            if instance['State']['Name'] == 'disabling':
+                pendingEc2s = pendingEc2s + 1
+            elif instance['State']['Name'] == 'pending':
+                pendingEc2s = pendingEc2s + 1
+            elif instance['State']['Name'] == 'running':
+                activeEc2s = activeEc2s + 1
     print("Active EC2s: ",activeEc2s)
     return pendingEc2s
 
@@ -151,6 +151,7 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 rkeConfig += reindent(instancePEM, 8)
                 rkeConfig += '\n'
 
+    print("Finalize config yaml")
     rkeConfig += ('\n'
     'addons: |-\n'
     '   ---\n'
