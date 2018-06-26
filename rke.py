@@ -315,8 +315,8 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
 
     try:
         response = requests.put(responseUrl,
-                                data=json_responseBody,
-                                headers=headers)
+        data=json_responseBody,
+        headers=headers)
         print("Status code: " + response.reason)
     except Exception as e:
         print("send(..) failed executing requests.put(..): " + str(e))
@@ -370,6 +370,7 @@ def run(event, context):
                     #Else if executed from Cloudformation or elsewhere, return true.
                     responseData['status'] = "success"
                     try:
+                        print("Tell Cloudformation we are good!")
                         send(event, context, SUCCESS, responseData)
                     except BaseException as e:
                         print(str(e))
