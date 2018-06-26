@@ -140,7 +140,6 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
-
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
