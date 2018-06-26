@@ -378,8 +378,10 @@ def run(event, context):
             except BaseException as e:
                 print("Something went wrong!  Wait 15 seconds and try again.")
                 time.sleep(15)
-                print(str(e))
-                publishSNSMessage(snsMessage,snsTopicArn)
+                try:
+                    publishSNSMessage(snsMessage,snsTopicArn)
+                except BaseException as e:
+                    print(str(e))
         except BaseException as e:
             print(str(e))
             return False
@@ -389,4 +391,4 @@ def run(event, context):
         try:
             publishSNSMessage(snsMessage,snsTopicArn)
         except BaseException as e:
-                print(str(e))
+            print(str(e))
