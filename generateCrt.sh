@@ -29,3 +29,7 @@ openssl req \
 
 #Sign the certificate from the CA
 openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+
+cat ca.crt | base64 -w0
+cat server.key | base64 -w0
+cat server.crt | base64 -w0
