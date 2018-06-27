@@ -43,8 +43,11 @@ def openssl(*args):
 
 def checkEc2s(asgName):
     filters = [{  
-    'Name': 'tag:aws:autoscaling:groupName',
-    'Values': [asgName]
+        'Name': 'tag:aws:autoscaling:groupName',
+        'Values': [asgName]
+    },{
+        'Name': 'instance-state-name',
+        'Values': 'running'
     }]
     pendingEc2s = 0
     activeEc2s = 0
@@ -341,6 +344,8 @@ def run(event, context):
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
         lifecycleHookName=snsMessage['LifecycleHookName']
         lifecycleActionToken=snsMessage['LifecycleActionToken']
+        print("snsMessage")
+        print(snsMessage)
     except BaseException as e:
         print(str(e))
 
@@ -357,6 +362,7 @@ def run(event, context):
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
             try:
+                #Need to test if servers actually change since last time.  Rke takes a while to run.
                 print("Run RKE")
                 _init_bin('rke')
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
