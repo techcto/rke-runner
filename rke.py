@@ -15,6 +15,7 @@ OPENSSL = '/usr/bin/openssl'
 SUCCESS = "SUCCESS"
 FAILED = "FAILED"
 
+#Define Utility Scripts
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
 
@@ -37,11 +38,58 @@ def _init_bin(executable_name):
     elapsed = (time.clock() - start)
     print(executable_name+" ready in "+str(elapsed)+'s.')
 
+def _key_existing_size__head(client, bucket, key):
+    try:
+        obj = client.head_object(Bucket=bucket, Key=key)
+        return obj['ContentLength']
+    except BaseException as e:
+            print(str(e))
+
+def reindent(s, numSpaces):
+    leading_space = numSpaces * ' '
+    lines = [ leading_space + line.strip( )
+              for line in s.splitlines( ) ]
+    return '\n'.join(lines)
+
 def openssl(*args):
     cmdline = [OPENSSL] + list(args)
     subprocess.check_call(cmdline)
 
-def checkEc2s(asgName):
+def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+    responseUrl = event['ResponseURL']
+
+    print(responseUrl)
+
+    responseBody = {}
+    responseBody['Status'] = responseStatus
+    responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
+    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
+    responseBody['StackId'] = event['StackId']
+    responseBody['RequestId'] = event['RequestId']
+    responseBody['LogicalResourceId'] = event['LogicalResourceId']
+    responseBody['NoEcho'] = noEcho
+    responseBody['Data'] = responseData
+
+    json_responseBody = json.dumps(responseBody)
+
+    print("Response body:\n" + json_responseBody)
+
+    headers = {
+        'content-type' : '',
+        'content-length' : str(len(json_responseBody))
+    }
+
+    try:
+        response = requests.put(responseUrl,
+        data=json_responseBody,
+        headers=headers)
+        print("Status code: " + response.reason)
+    except Exception as e:
+        print("send(..) failed executing requests.put(..): " + str(e))
+
+#Start App
+def getActiveInstances(asgName):
+    #Step 1: Get all instances for an ASG
     filters = [{  
         'Name': 'tag:aws:autoscaling:groupName',
         'Values': [asgName]
@@ -49,29 +97,23 @@ def checkEc2s(asgName):
         'Name': 'instance-state-name',
         'Values': 'running'
     }]
-    pendingEc2s = 0
-    activeEc2s = 0
 
+    asgInstances={}
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
-            print(str(instance['State']['Name']))
-            print(str(instance))
-            if instance['State']['Name'] == 'disabling':
-                pendingEc2s = pendingEc2s + 1
-            elif instance['State']['Name'] == 'pending':
-                pendingEc2s = pendingEc2s + 1
-            elif instance['State']['Name'] == 'running':
-                activeEc2s = activeEc2s + 1
-    print("Active EC2s: ",activeEc2s)
-    return pendingEc2s
+            #Check to see if instance is healthy
+            for auto_scaling_instance in autoscalingClient.describe_auto_scaling_instances(
+                InstanceIds=[
+                    instance['InstanceId']
+                ]
+            ):
+                print(auto_scaling_instance)
+                if auto_scaling_instance['health_status'] == 'HEALTHY':   
+                    asgInstances.append(instance)
 
-def _key_existing_size__head(client, bucket, key):
-    try:
-        obj = client.head_object(Bucket=bucket, Key=key)
-        return obj['ContentLength']
-    except BaseException as e:
-            print(str(e))
+    print(asgInstances)
+    return asgInstances
 
 def generateCertificates(FQDN):
     #Create CA Signing Authority
@@ -123,18 +165,7 @@ def generateCertificates(FQDN):
 
     return rkeCrts
 
-def reindent(s, numSpaces):
-    leading_space = numSpaces * ' '
-    lines = [ leading_space + line.strip( )
-              for line in s.splitlines( ) ]
-    return '\n'.join(lines)
-
-def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
-    print("FQDN: " + FQDN)
-    filters = [{  
-    'Name': 'tag:aws:autoscaling:groupName',
-    'Values': [asgName]
-    }]
+def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
 
     rkeConfig = ('# default k8s version: v1.8.9-rancher1-1\n'
                 '# default network plugin: flannel\n'
@@ -143,16 +174,14 @@ def generateRKEConfig(asgName, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
-    for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
-        print(reservation['Instances'])
-        for instance in reservation['Instances']:
-            if instance['State']['Name'] == 'running':
-                rkeConfig += ('  - address: ' + instance['PublicIpAddress'] + '\n'
-                              '    user: ' + instanceUser + '\n'
-                              '    role: [controlplane,etcd,worker]\n'
-                              '    ssh_key: |- \n')
-                rkeConfig += reindent(instancePEM, 8)
-                rkeConfig += '\n'
+    for instance in asgInstances:
+        print(instance)
+        rkeConfig += ('  - address: ' + instance['PublicIpAddress'] + '\n'
+                        '    user: ' + instanceUser + '\n'
+                        '    role: [controlplane,etcd,worker]\n'
+                        '    ssh_key: |- \n')
+        rkeConfig += reindent(instancePEM, 8)
+        rkeConfig += '\n'
 
     print("Finalize config yaml")
     rkeConfig += ('\n'
@@ -292,38 +321,6 @@ def bucket_folder_exists(client, bucket, path_prefix):
         return True
     return False
 
-def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
-    responseUrl = event['ResponseURL']
-
-    print(responseUrl)
-
-    responseBody = {}
-    responseBody['Status'] = responseStatus
-    responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
-    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-    responseBody['StackId'] = event['StackId']
-    responseBody['RequestId'] = event['RequestId']
-    responseBody['LogicalResourceId'] = event['LogicalResourceId']
-    responseBody['NoEcho'] = noEcho
-    responseBody['Data'] = responseData
-
-    json_responseBody = json.dumps(responseBody)
-
-    print("Response body:\n" + json_responseBody)
-
-    headers = {
-        'content-type' : '',
-        'content-length' : str(len(json_responseBody))
-    }
-
-    try:
-        response = requests.put(responseUrl,
-        data=json_responseBody,
-        headers=headers)
-        print("Status code: " + response.reason)
-    except Exception as e:
-        print("send(..) failed executing requests.put(..): " + str(e))
-
 def run(event, context):
     instanceUser=os.environ['InstanceUser']
     FQDN=os.environ['FQDN']
@@ -349,52 +346,50 @@ def run(event, context):
     except BaseException as e:
         print(str(e))
 
-    #Test if all ec2s in ASG are ready
-    pendingEc2s=checkEc2s(asgName);
+    # #Test if all ec2s in ASG are ready
+    # pendingEc2s=checkEc2s(asgName);
 
-    if pendingEc2s==0:
-        print("Create RKE config")
-        rkeCrts = generateCertificates(FQDN)
-        generateRKEConfig(asgName,instanceUser,instancePEM,FQDN,rkeCrts)
+    #Get active instances
+    asgInstances = getActiveInstances(asgName)
+
+    #Generate / Get certificates
+    rkeCrts = generateCertificates(FQDN)
+
+    #Generate RKE required config.yaml
+    print("Create RKE config")
+    generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+
+    try:
+        print("Upload RKE config to S3")
+        s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
         try:
-            print("Upload RKE config to S3")
-            s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
-
+            #Need to test if servers actually change since last time.  Rke takes a while to run.
+            print("Run RKE")
+            _init_bin('rke')
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
             try:
-                #Need to test if servers actually change since last time.  Rke takes a while to run.
-                print("Run RKE")
-                _init_bin('rke')
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
-                try:
-                    #If Lambda executed from Lifecycle Event, issue success command
-                    print("Complete Lifecycle Event")
-                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-                except BaseException as e:
-                    print(str(e))
-                    #Else if executed from Cloudformation or elsewhere, return true.
-                    responseData['status'] = "success"
-                    try:
-                        print("Tell Cloudformation we are good!")
-                        send(event, context, SUCCESS, responseData)
-                    except BaseException as e:
-                        print(str(e))
-                        return False
+                #If Lambda executed from Lifecycle Event, issue success command
+                print("Complete Lifecycle Event")
+                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
             except BaseException as e:
-                print("Something went wrong!  Wait 15 seconds and try again.")
-                time.sleep(15)
+                print(str(e))
+                #Else if executed from Cloudformation or elsewhere, return true.
+                responseData['status'] = "success"
                 try:
-                    publishSNSMessage(snsMessage,snsTopicArn)
+                    print("Tell Cloudformation we are good!")
+                    send(event, context, SUCCESS, responseData)
                 except BaseException as e:
                     print(str(e))
+                    return False
         except BaseException as e:
-            print(str(e))
-            return False
-    elif pendingEc2s>=1:
-        print("Servers are not ready!  Wait 15 seconds and try again.")
-        time.sleep(15)
-        try:
-            publishSNSMessage(snsMessage,snsTopicArn)
-        except BaseException as e:
-            print(str(e))
+            print("Something went wrong!  Wait 15 seconds and try again.")
+            time.sleep(15)
+            try:
+                publishSNSMessage(snsMessage,snsTopicArn)
+            except BaseException as e:
+                print(str(e))
+    except BaseException as e:
+        print(str(e))
+        return False
