@@ -89,7 +89,7 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
 
 #Start App
 def getActiveInstances(asgName):
-    #Step 1: Get all instances for an ASG
+    #Get all instances for an ASG
     filters = [{  
         'Name': 'tag:aws:autoscaling:groupName',
         'Values': [asgName]
@@ -110,7 +110,7 @@ def getActiveInstances(asgName):
             for asgInstance in response['AutoScalingInstances']:
                 print("ASG Instance Status")
                 print(asgInstance)
-                if asgInstance['HealthStatus'] == 'HEALTHY':   
+                if asgInstance['LifecycleState'] == 'InService':   
                     asgInstances.append(instance)
 
     return asgInstances
