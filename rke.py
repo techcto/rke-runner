@@ -100,7 +100,7 @@ def getActiveInstances(asgName):
         print(reservation['Instances'])
         for instance in reservation['Instances']:
             #Check to see if instance is healthy
-            response in autoscalingClient.describe_auto_scaling_instances(
+            response = autoscalingClient.describe_auto_scaling_instances(
                 InstanceIds=[
                     instance['InstanceId']
                 ]
