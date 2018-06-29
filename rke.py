@@ -96,6 +96,7 @@ def getActiveInstances(asgName):
     }]
 
     asgInstances = []
+    print("Print ASG Instances")
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
@@ -107,12 +108,11 @@ def getActiveInstances(asgName):
             )
 
             for asgInstance in response['AutoScalingInstances']:
-                print("Print Instance")
+                print("ASG Instance Status")
                 print(asgInstance)
                 if asgInstance['HealthStatus'] == 'HEALTHY':   
                     asgInstances.append(instance)
 
-    print(asgInstances)
     return asgInstances
 
 def generateCertificates(FQDN):
@@ -175,7 +175,6 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
                 'nodes:\n')
 
     for instance in asgInstances:
-        print(instance)
         rkeConfig += ('  - address: ' + instance['PublicIpAddress'] + '\n'
                         '    user: ' + instanceUser + '\n'
                         '    role: [controlplane,etcd,worker]\n'
@@ -322,6 +321,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
     return False
 
 def run(event, context):
+    print("Start App")
     instanceUser=os.environ['InstanceUser']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
@@ -330,6 +330,7 @@ def run(event, context):
     responseData = {}
 
     #Download Instance RSA Key from S3
+    print("Copy RSA from S3 to local")
     s3 = boto3.resource('s3')
     s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
     with open("/tmp/rsa.pem", "rb") as rsa:
@@ -346,13 +347,12 @@ def run(event, context):
     except BaseException as e:
         print(str(e))
 
-    #Get active instances
+    print("Get Active Instances")
     asgInstances = getActiveInstances(asgName)
 
-    #Generate / Get certificates
+    print("Generate / Get certificates")
     rkeCrts = generateCertificates(FQDN)
 
-    #Generate RKE required config.yaml
     print("Create RKE config")
     generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
