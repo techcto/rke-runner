@@ -93,9 +93,6 @@ def getActiveInstances(asgName):
     filters = [{  
         'Name': 'tag:aws:autoscaling:groupName',
         'Values': [asgName]
-    },{
-        'Name': 'instance-state-name',
-        'Values': 'running'
     }]
 
     asgInstances={}
@@ -345,9 +342,6 @@ def run(event, context):
         print(snsMessage)
     except BaseException as e:
         print(str(e))
-
-    # #Test if all ec2s in ASG are ready
-    # pendingEc2s=checkEc2s(asgName);
 
     #Get active instances
     asgInstances = getActiveInstances(asgName)
