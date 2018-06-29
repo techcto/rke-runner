@@ -105,9 +105,11 @@ def getActiveInstances(asgName):
                     instance['InstanceId']
                 ]
             ):
-                print(auto_scaling_instance)
-                if auto_scaling_instance['health_status'] == 'HEALTHY':   
-                    asgInstances.append(instance)
+                for asgInstance in response['AutoScalingInstances']:
+                    print("Print Instance")
+                    print(asgInstance)
+                    if asgInstance['health_status'] == 'HEALTHY':   
+                        asgInstances.append(instance)
 
     print(asgInstances)
     return asgInstances
