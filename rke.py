@@ -110,10 +110,10 @@ def getActiveInstances(asgName):
             for asgInstance in response['AutoScalingInstances']:
                 print("ASG Instance Status")
                 print(asgInstance)
-                else if asgInstance['LifecycleState'] == 'Pending:Wait':   
+                if asgInstance['LifecycleState'] == 'Pending:Wait':   
                     print("Pending instance not ready.  Try again later!")
                     return false
-                else if asgInstance['LifecycleState'] == 'InService':   
+                elif asgInstance['LifecycleState'] == 'InService':   
                     asgInstances.append(instance)
 
     return asgInstances
@@ -382,7 +382,7 @@ def run(event, context):
                         send(event, context, SUCCESS, responseData)
                     except BaseException as e:
                         print(str(e))
-                        return False
+                        return responseData
             except BaseException as e:
                 print("Something went wrong!  Wait 15 seconds and try again.")
                 time.sleep(15)
