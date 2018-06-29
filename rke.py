@@ -110,7 +110,10 @@ def getActiveInstances(asgName):
             for asgInstance in response['AutoScalingInstances']:
                 print("ASG Instance Status")
                 print(asgInstance)
-                if asgInstance['LifecycleState'] == 'InService':   
+                else if asgInstance['LifecycleState'] == 'Pending:Wait':   
+                    print("Pending instance not ready.  Try again later!")
+                    return false
+                else if asgInstance['LifecycleState'] == 'InService':   
                     asgInstances.append(instance)
 
     return asgInstances
@@ -349,44 +352,51 @@ def run(event, context):
 
     print("Get Active Instances")
     asgInstances = getActiveInstances(asgName)
+    if asgInstances:
+        print("Generate / Get certificates")
+        rkeCrts = generateCertificates(FQDN)
 
-    print("Generate / Get certificates")
-    rkeCrts = generateCertificates(FQDN)
-
-    print("Create RKE config")
-    generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
-
-    try:
-        print("Upload RKE config to S3")
-        s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
+        print("Create RKE config")
+        generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
         try:
-            #Need to test if servers actually change since last time.  Rke takes a while to run.
-            print("Run RKE")
-            _init_bin('rke')
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+            print("Upload RKE config to S3")
+            s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
+
             try:
-                #If Lambda executed from Lifecycle Event, issue success command
-                print("Complete Lifecycle Event")
-                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-            except BaseException as e:
-                print(str(e))
-                #Else if executed from Cloudformation or elsewhere, return true.
-                responseData['status'] = "success"
+                #Need to test if servers actually change since last time.  Rke takes a while to run.
+                print("Run RKE")
+                _init_bin('rke')
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
                 try:
-                    print("Tell Cloudformation we are good!")
-                    send(event, context, SUCCESS, responseData)
+                    #If Lambda executed from Lifecycle Event, issue success command
+                    print("Complete Lifecycle Event")
+                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 except BaseException as e:
                     print(str(e))
-                    return False
-        except BaseException as e:
-            print("Something went wrong!  Wait 15 seconds and try again.")
-            time.sleep(15)
-            try:
-                publishSNSMessage(snsMessage,snsTopicArn)
+                    #Else if executed from Cloudformation or elsewhere, return true.
+                    responseData['status'] = "success"
+                    try:
+                        print("Tell Cloudformation we are good!")
+                        send(event, context, SUCCESS, responseData)
+                    except BaseException as e:
+                        print(str(e))
+                        return False
             except BaseException as e:
-                print(str(e))
-    except BaseException as e:
-        print(str(e))
-        return False
+                print("Something went wrong!  Wait 15 seconds and try again.")
+                time.sleep(15)
+                try:
+                    publishSNSMessage(snsMessage,snsTopicArn)
+                except BaseException as e:
+                    print(str(e))
+        except BaseException as e:
+            print(str(e))
+            return False
+    else:
+        print("Pending instances not ready!  Wait 15 seconds and try again.")
+        time.sleep(15)
+        try:
+            publishSNSMessage(snsMessage,snsTopicArn)
+        except BaseException as e:
+            print(str(e))
