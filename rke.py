@@ -95,7 +95,7 @@ def getActiveInstances(asgName):
         'Values': [asgName]
     }]
 
-    asgInstances={}
+    asgInstances = []
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
