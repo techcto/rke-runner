@@ -196,6 +196,12 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
 
     print("Finalize config yaml")
     rkeConfig += ('\n'
+    'services:\n'
+    '  etcd:\n'
+    '    path: /etcdcluster\n'
+    '    external_urls:\n'
+    '      - https://127.0.0.1:2379\n'
+    '\n'
     'addons: |-\n'
     '   ---\n'
     '   kind: Namespace\n'
