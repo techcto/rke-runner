@@ -367,20 +367,20 @@ def run(event, context):
                 print("Init RKE")
                 _init_bin('rke')
 
-                print("Backup ETCD to S3")
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                # print("Backup ETCD to S3")
+                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--config', '/tmp/config.yaml']
+                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
                 print("Run RKE / Update Cluster")
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
-                #Restore Snapshot
-                print("Restore ETCD snapshot from S3")
-                s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+                # #Restore Snapshot
+                # print("Restore ETCD snapshot from S3")
+                # s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 try:
                     #If Lambda executed from Lifecycle Event, issue success command
