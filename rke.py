@@ -171,10 +171,7 @@ def generateCertificates(FQDN):
 
 def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
 
-    rkeConfig = ('# default k8s version: v1.8.9-rancher1-1\n'
-                '# default network plugin: flannel\n'
-                '\n'
-                'ignore_docker_version: true\n'
+    rkeConfig = ('ignore_docker_version: true\n'
                 '\n'
                 'nodes:\n')
 
