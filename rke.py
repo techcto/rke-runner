@@ -110,11 +110,11 @@ def getActiveInstances(asgName):
             for asgInstance in response['AutoScalingInstances']:
                 print("ASG Instance Status")
                 print(asgInstance)
-                if asgInstance['LifecycleState'] == 'Pending:Wait':   
-                    # print("Pending instance not ready.  Try again later!")
-                    # return False
-                    asgInstances.append(instance)
-                elif asgInstance['LifecycleState'] == 'InService':   
+                if (asgInstance['LifecycleState'] == 'Terminated') or (asgInstance['LifecycleState'] == 'Terminating') or (asgInstance['LifecycleState'] == 'Terminating:Wait') or (asgInstance['LifecycleState'] == 'Terminating:Proceed'):   
+                    print("We are losing a instance, so lets do nothing and wait for reinforcements")
+                    return False
+                elif (asgInstance['LifecycleState'] == 'InService') or (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait'):   
+                    print("This instance is good to go!")
                     asgInstances.append(instance)
 
     return asgInstances
@@ -407,9 +407,11 @@ def run(event, context):
             print(str(e))
             return False
     else:
-        print("Pending instances not ready!  Wait 15 seconds and try again.")
-        time.sleep(15)
         try:
-            publishSNSMessage(snsMessage,snsTopicArn)
+            # time.sleep(15)
+            # publishSNSMessage(snsMessage,snsTopicArn)
+            print("We are losing instances or something worse.  The best action is to nothing and hope new servers can heal cluster.")
+            print("Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
         except BaseException as e:
             print(str(e))
