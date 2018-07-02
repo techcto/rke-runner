@@ -182,7 +182,7 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     instanceCount = 0;
     for instance in asgInstances:
         if (instanceCount<3):
-            role = 'controlplane,etcd,worker'
+            role = 'controlplane,worker'
         else:
             role = 'worker'
         instanceCount += 1
