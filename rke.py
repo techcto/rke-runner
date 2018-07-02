@@ -111,8 +111,9 @@ def getActiveInstances(asgName):
                 print("ASG Instance Status")
                 print(asgInstance)
                 if asgInstance['LifecycleState'] == 'Pending:Wait':   
-                    print("Pending instance not ready.  Try again later!")
-                    return False
+                    # print("Pending instance not ready.  Try again later!")
+                    # return False
+                    asgInstances.append(instance)
                 elif asgInstance['LifecycleState'] == 'InService':   
                     asgInstances.append(instance)
 
@@ -376,7 +377,6 @@ def run(event, context):
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
-                # #Restore Snapshot
                 # print("Restore ETCD snapshot from S3")
                 # s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
                 # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
