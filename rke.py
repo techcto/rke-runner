@@ -113,13 +113,6 @@ def getActiveInstances(asgName):
                 if (asgInstance['LifecycleState'] == 'InService') or (asgInstance['LifecycleState'] == 'Pending'):   
                     print("This instance is good to go!")
                     asgInstances.append(instance)
-                elif asgInstance['LifecycleState'] == 'Pending:Wait':
-                    print("Our new instance is not ready!  Wait 15 seconds and try again.")
-                    time.sleep(15)
-                    try:
-                        publishSNSMessage(snsMessage,snsTopicArn)
-                    except BaseException as e:
-                        print(str(e))
 
 
     return asgInstances
@@ -436,9 +429,11 @@ def run(event, context):
             return False
     else:
         try:
-            # time.sleep(15)
-            # publishSNSMessage(snsMessage,snsTopicArn)
-            print("Default Complete Lifecycle Event")
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            print("Our new instance is not ready!  Wait 15 seconds and try again.")
+            time.sleep(15)
+            try:
+                publishSNSMessage(snsMessage,snsTopicArn)
+            except BaseException as e:
+                print(str(e))
         except BaseException as e:
             print(str(e))
