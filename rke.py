@@ -110,10 +110,7 @@ def getActiveInstances(asgName):
             for asgInstance in response['AutoScalingInstances']:
                 print("ASG Instance Status")
                 print(asgInstance)
-                if (asgInstance['LifecycleState'] == 'Terminated') or (asgInstance['LifecycleState'] == 'Terminating') or (asgInstance['LifecycleState'] == 'Terminating:Wait') or (asgInstance['LifecycleState'] == 'Terminating:Proceed'):   
-                    print("We are losing a instance, so lets do nothing and wait for reinforcements")
-                    return False
-                elif (asgInstance['LifecycleState'] == 'InService') or (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait'):   
+                if (asgInstance['LifecycleState'] == 'InService') or (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait'):   
                     print("This instance is good to go!")
                     asgInstances.append(instance)
 
@@ -359,15 +356,21 @@ def run(event, context):
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
-        lifecycleHookName=snsMessage['LifecycleHookName']
-        lifecycleActionToken=snsMessage['LifecycleActionToken']
         print("snsMessage")
         print(snsMessage)
+        lifecycleHookName=snsMessage['LifecycleHookName']
+        lifecycleActionToken=snsMessage['LifecycleActionToken']
+        lifecycleTransition=snsMessage['LifecycleTransition']
+        if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
+            print("We are losing instances or something worse.  The best action is to nothing and hope new servers can heal cluster.")
+            print("Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
     except BaseException as e:
         print(str(e))
 
     print("Get Active Instances")
     asgInstances = getActiveInstances(asgName)
+    
     if asgInstances:
         print("Generate / Get certificates")
         rkeCrts = generateCertificates(FQDN)
@@ -425,8 +428,7 @@ def run(event, context):
         try:
             # time.sleep(15)
             # publishSNSMessage(snsMessage,snsTopicArn)
-            print("We are losing instances or something worse.  The best action is to nothing and hope new servers can heal cluster.")
-            print("Complete Lifecycle Event")
+            print("Default Complete Lifecycle Event")
             response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
         except BaseException as e:
             print(str(e))
