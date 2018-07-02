@@ -192,12 +192,16 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
         rkeConfig += '\n'
 
     print("Finalize config yaml")
+    #For every node that has the etcd role, these backups are saved to /opt/rke/etcd-snapshots/.
     rkeConfig += ('\n'
     'services:\n'
     '  etcd:\n'
-    '    path: /etcdcluster\n'
-    '    external_urls:\n'
-    '      - https://127.0.0.1:2379\n'
+    '    snapshot: true\n'
+    '    creation: 5m0s\n'
+    '    retention: 24h\n'
+    # '    path: /etcdcluster\n'
+    # '    external_urls:\n'
+    # '      - https://127.0.0.1:2379\n'
     '\n'
     'addons: |-\n'
     '   ---\n'
