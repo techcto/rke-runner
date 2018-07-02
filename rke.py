@@ -361,16 +361,18 @@ def run(event, context):
         lifecycleHookName=snsMessage['LifecycleHookName']
         lifecycleActionToken=snsMessage['LifecycleActionToken']
         lifecycleTransition=snsMessage['LifecycleTransition']
+
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
             print("We are losing instances or something worse.  The best action is to nothing and hope new servers can heal cluster.")
             print("Complete Lifecycle Event")
             response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            return True
     except BaseException as e:
         print(str(e))
 
     print("Get Active Instances")
     asgInstances = getActiveInstances(asgName)
-    
+
     if asgInstances:
         print("Generate / Get certificates")
         rkeCrts = generateCertificates(FQDN)
