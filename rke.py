@@ -178,10 +178,18 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
+    print("Get instance count")
+    instanceCount = 0;
     for instance in asgInstances:
+        if (instanceCount<=3):
+            role = 'controlplane,etcd,worker'
+        else:
+            role = 'worker'
+        instanceCount += 1
+
         rkeConfig += ('  - address: ' + instance['PublicIpAddress'] + '\n'
                         '    user: ' + instanceUser + '\n'
-                        '    role: [controlplane,etcd,worker]\n'
+                        '    role: [' + role + ']\n'
                         '    ssh_key: |- \n')
         rkeConfig += reindent(instancePEM, 8)
         rkeConfig += '\n'
