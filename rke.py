@@ -55,6 +55,18 @@ def openssl(*args):
     cmdline = [OPENSSL] + list(args)
     subprocess.check_call(cmdline)
 
+def bucket_folder_exists(client, bucket, path_prefix):
+    # make path_prefix exact match and not path/to/folder*
+    if list(path_prefix)[-1] is not '/':
+        path_prefix += '/'
+
+    # check if 'Contents' key exist in response dict - if it exist it indicate the folder exists, otherwise response will be None.
+    response = client.list_objects_v2(Bucket=bucket, Prefix=path_prefix).get('Contents')
+
+    if response:
+        return True
+    return False
+
 def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
     responseUrl = event['ResponseURL']
 
@@ -86,36 +98,6 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
         print("Status code: " + response.reason)
     except Exception as e:
         print("send(..) failed executing requests.put(..): " + str(e))
-
-#Start App
-def getActiveInstances(asgName):
-    #Get all instances for an ASG
-    filters = [{  
-        'Name': 'tag:aws:autoscaling:groupName',
-        'Values': [asgName]
-    }]
-
-    asgInstances = []
-    print("Print ASG Instances")
-    for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
-        print(reservation['Instances'])
-        for instance in reservation['Instances']:
-            #Check to see if instance is healthy
-            response = autoscalingClient.describe_auto_scaling_instances(
-                InstanceIds=[
-                    instance['InstanceId']
-                ]
-            )
-
-            for asgInstance in response['AutoScalingInstances']:
-                print("ASG Instance Status")
-                print(asgInstance)
-                if (asgInstance['LifecycleState'] == 'InService') or (asgInstance['LifecycleState'] == 'Pending'):   
-                    print("This instance is good to go!")
-                    asgInstances.append(instance)
-
-
-    return asgInstances
 
 def generateCertificates(FQDN):
     #Create CA Signing Authority
@@ -167,8 +149,141 @@ def generateCertificates(FQDN):
 
     return rkeCrts
 
-def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
+#Start App
+def getActiveInstances(asgName):
+    #Get all instances for an ASG
+    filters = [{  
+        'Name': 'tag:aws:autoscaling:groupName',
+        'Values': [asgName]
+    }]
 
+    asgInstances = []
+    print("Print ASG Instances")
+    for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
+        print(reservation['Instances'])
+        for instance in reservation['Instances']:
+            #Check to see if instance is healthy
+            response = autoscalingClient.describe_auto_scaling_instances(
+                InstanceIds=[
+                    instance['InstanceId']
+                ]
+            )
+
+            for asgInstance in response['AutoScalingInstances']:
+                print("ASG Instance Status")
+                print(asgInstance)
+                if (asgInstance['LifecycleState'] == 'InService'):   
+                    print("This instance is good to go!")
+                    asgInstances.append(instance)
+                elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
+                    print("We have a new instance.  Welcome!")
+                    asgInstances.append(instance)
+
+    return asgInstances
+
+def run(event, context):
+    print("Start App")
+    instanceUser=os.environ['InstanceUser']
+    FQDN=os.environ['FQDN']
+    rkeS3Bucket=os.environ['rkeS3Bucket']
+    asgName=os.environ['CLUSTER']
+    pendingEc2s=0
+    responseData = {}
+
+    #Download Instance RSA Key from S3
+    print("Copy RSA from S3 to local")
+    s3 = boto3.resource('s3')
+    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
+    with open("/tmp/rsa.pem", "rb") as rsa:
+        instancePEM = rsa.read().decode("utf-8")
+
+    #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
+    try:
+        snsTopicArn=event['Records'][0]['Sns']['TopicArn']
+        snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
+        print("snsMessage")
+        print(snsMessage)
+        lifecycleHookName=snsMessage['LifecycleHookName']
+        lifecycleActionToken=snsMessage['LifecycleActionToken']
+        lifecycleTransition=snsMessage['LifecycleTransition']
+
+        if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
+            print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
+            print("Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            return True
+    except BaseException as e:
+        print(str(e))
+
+    print("Get Active Instances")
+    asgInstances = getActiveInstances(asgName)
+
+    if asgInstances:
+        print("Generate / Get certificates")
+        rkeCrts = generateCertificates(FQDN)
+
+        print("Create RKE config")
+        generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+
+        try:
+            print("Upload RKE config to S3")
+            s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
+
+            try:
+                print("Init RKE")
+                _init_bin('rke')
+
+                # print("Backup ETCD to S3")
+                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--config', '/tmp/config.yaml']
+                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+
+                print("Run RKE / Update Cluster")
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+
+                # print("Restore ETCD snapshot from S3")
+                # s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+
+                try:
+                    #If Lambda executed from Lifecycle Event, issue success command
+                    print("Complete Lifecycle Event")
+                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+                except BaseException as e:
+                    print(str(e))
+                    #Else if executed from Cloudformation or elsewhere, return true.
+                    responseData['status'] = "success"
+                    try:
+                        print("Tell Cloudformation we are good!")
+                        send(event, context, SUCCESS, responseData)
+                    except BaseException as e:
+                        print(str(e))
+                        return responseData
+            except BaseException as e:
+                print("Something went wrong! Complete Lifecycle Event")
+                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+                # time.sleep(15)
+                # try:
+                #     publishSNSMessage(snsMessage,snsTopicArn)
+                # except BaseException as e:
+                #     print(str(e))
+        except BaseException as e:
+            print(str(e))
+            return False
+    else:
+        try:
+            print("Our new instance is not ready!  Wait 15 seconds and try again.")
+            time.sleep(15)
+            try:
+                publishSNSMessage(snsMessage,snsTopicArn)
+            except BaseException as e:
+                print(str(e))
+        except BaseException as e:
+            print(str(e))
+
+def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     rkeConfig = ('ignore_docker_version: true\n'
                 '\n'
                 'nodes:\n')
@@ -324,116 +439,3 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     outF = open('/tmp/config.yaml', 'w')
     outF.write(rkeConfig)
     outF.close()
-
-def bucket_folder_exists(client, bucket, path_prefix):
-    # make path_prefix exact match and not path/to/folder*
-    if list(path_prefix)[-1] is not '/':
-        path_prefix += '/'
-
-    # check if 'Contents' key exist in response dict - if it exist it indicate the folder exists, otherwise response will be None.
-    response = client.list_objects_v2(Bucket=bucket, Prefix=path_prefix).get('Contents')
-
-    if response:
-        return True
-    return False
-
-def run(event, context):
-    print("Start App")
-    instanceUser=os.environ['InstanceUser']
-    FQDN=os.environ['FQDN']
-    rkeS3Bucket=os.environ['rkeS3Bucket']
-    asgName=os.environ['CLUSTER']
-    pendingEc2s=0
-    responseData = {}
-
-    #Download Instance RSA Key from S3
-    print("Copy RSA from S3 to local")
-    s3 = boto3.resource('s3')
-    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
-    with open("/tmp/rsa.pem", "rb") as rsa:
-        instancePEM = rsa.read().decode("utf-8")
-
-    #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Manually)
-    try:
-        snsTopicArn=event['Records'][0]['Sns']['TopicArn']
-        snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
-        print("snsMessage")
-        print(snsMessage)
-        lifecycleHookName=snsMessage['LifecycleHookName']
-        lifecycleActionToken=snsMessage['LifecycleActionToken']
-        lifecycleTransition=snsMessage['LifecycleTransition']
-
-        if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
-            print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
-            print("Complete Lifecycle Event")
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-            return True
-    except BaseException as e:
-        print(str(e))
-
-    print("Get Active Instances")
-    asgInstances = getActiveInstances(asgName)
-
-    if asgInstances:
-        print("Generate / Get certificates")
-        rkeCrts = generateCertificates(FQDN)
-
-        print("Create RKE config")
-        generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
-
-        try:
-            print("Upload RKE config to S3")
-            s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
-
-            try:
-                print("Init RKE")
-                _init_bin('rke')
-
-                # print("Backup ETCD to S3")
-                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--config', '/tmp/config.yaml']
-                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
-
-                print("Run RKE / Update Cluster")
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
-
-                # print("Restore ETCD snapshot from S3")
-                # s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-
-                try:
-                    #If Lambda executed from Lifecycle Event, issue success command
-                    print("Complete Lifecycle Event")
-                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-                except BaseException as e:
-                    print(str(e))
-                    #Else if executed from Cloudformation or elsewhere, return true.
-                    responseData['status'] = "success"
-                    try:
-                        print("Tell Cloudformation we are good!")
-                        send(event, context, SUCCESS, responseData)
-                    except BaseException as e:
-                        print(str(e))
-                        return responseData
-            except BaseException as e:
-                print("Something went wrong!  Wait 15 seconds and try again.")
-                time.sleep(15)
-                try:
-                    publishSNSMessage(snsMessage,snsTopicArn)
-                except BaseException as e:
-                    print(str(e))
-        except BaseException as e:
-            print(str(e))
-            return False
-    else:
-        try:
-            print("Our new instance is not ready!  Wait 15 seconds and try again.")
-            time.sleep(15)
-            try:
-                publishSNSMessage(snsMessage,snsTopicArn)
-            except BaseException as e:
-                print(str(e))
-        except BaseException as e:
-            print(str(e))
