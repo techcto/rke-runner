@@ -281,7 +281,7 @@ def run(event, context):
                 #     "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
                 # ]
                 # execute_cmd(asgInstances[0]['PublicIpAddress'], commands)
-                download_file("/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
 
                 print("Upload snapshot to S3")
                 s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
