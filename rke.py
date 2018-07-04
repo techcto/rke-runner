@@ -355,7 +355,6 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
         rkeConfig += reindent(instancePEM, 8)
         rkeConfig += '\n'
 
-    print(instanceCount + " instances in cluster")
     print("Finalize config yaml")
     #For every node that has the etcd role, these backups are saved to /opt/rke/etcd-snapshots/.
     rkeConfig += ('\n'
