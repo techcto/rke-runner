@@ -197,7 +197,10 @@ def getActiveInstances(asgName):
         'Values': [asgName]
     }]
 
-    asgInstances = []
+    asgInstances = ["active", "new"]
+    asgInstances["active"] = []
+    asgInstances["new"] = []
+
     print("Print ASG Instances")
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
@@ -214,10 +217,10 @@ def getActiveInstances(asgName):
                 print(asgInstance)
                 if (asgInstance['LifecycleState'] == 'InService'):   
                     print("This instance is good to go!")
-                    asgInstances.append(instance)
+                    asgInstances["active"].append(instance)
                 elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
                     print("We have a new instance.  Welcome!")
-                    asgInstances.append(instance)
+                    asgInstances["new"].append(instance)
 
     return asgInstances
 
@@ -261,72 +264,71 @@ def run(event, context):
         print("Generate / Get certificates")
         rkeCrts = generateCertificates(FQDN)
 
-        print("Create RKE config")
-        generateRKEConfig(asgInstances,instanceUser,instancePEM,FQDN,rkeCrts)
-
         try:
+            print("Init RKE")
+            _init_bin('rke')
+
+            print("Generate RKE ETCD back config")
+            generateRKEConfig(asgInstances["active"],instanceUser,instancePEM,FQDN,rkeCrts)
+
+            print("Backup ETCD")
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
+            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+
+            print("Login to ETCD instance and copy backup to tmp")
+            try:
+                download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+            except BaseException as e:
+                print(str(e))
+                print("Try next instance")
+                try:
+                    download_file(asgInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                except BaseException as e:
+                    print(str(e))
+                    print("No go.  Good luck.  I hope you have other backups.")
+
+            print("Upload snapshot to S3")
+            s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+
+            print("Generate RKE config")
+            generateRKEConfig(asgInstances["active"] + asgInstances["new"],instanceUser,instancePEM,FQDN,rkeCrts)
+
             print("Upload RKE config to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
+            print("Run RKE / Update Cluster")
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+
+            print("Restore ETCD snapshot")
+            s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+
             try:
-                print("Init RKE")
-                _init_bin('rke')
-
-                print("Backup ETCD")
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-
-                print("Login to ETCD instance and copy backup to tmp")
-                try:
-                    download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
-                except BaseException as e:
-                    print(str(e))
-                    print("Try next instance")
-                    try:
-                        download_file(asgInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
-                    except BaseException as e:
-                        print(str(e))
-                        print("No go.  Good luck.  I hope you have other backups.")
-
-                print("Upload snapshot to S3")
-                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
-
-                print("Run RKE / Update Cluster")
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
-
-                print("Restore ETCD snapshot")
-                s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-
-                try:
-                    #If Lambda executed from Lifecycle Event, issue success command
-                    print("Complete Lifecycle Event")
-                    response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-                except BaseException as e:
-                    print(str(e))
-                    #Else if executed from Cloudformation or elsewhere, return true.
-                    responseData['status'] = "success"
-                    try:
-                        print("Tell Cloudformation we are good!")
-                        send(event, context, SUCCESS, responseData)
-                    except BaseException as e:
-                        print(str(e))
-                        return responseData
+                #If Lambda executed from Lifecycle Event, issue success command
+                print("Complete Lifecycle Event")
+                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
             except BaseException as e:
                 print(str(e))
-                print("Something went wrong! Complete Lifecycle Event")
-                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-                # time.sleep(15)
-                # try:
-                #     publishSNSMessage(snsMessage,snsTopicArn)
-                # except BaseException as e:
-                #     print(str(e))
+                #Else if executed from Cloudformation or elsewhere, return true.
+                responseData['status'] = "success"
+                try:
+                    print("Tell Cloudformation we are good!")
+                    send(event, context, SUCCESS, responseData)
+                except BaseException as e:
+                    print(str(e))
+                    return responseData
         except BaseException as e:
             print(str(e))
-            return False
+            print("Something went wrong! Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            # time.sleep(15)
+            # try:
+            #     publishSNSMessage(snsMessage,snsTopicArn)
+            # except BaseException as e:
+            #     print(str(e))
     else:
         try:
             print("Our new instance is not ready!  Wait 15 seconds and try again.")
