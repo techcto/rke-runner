@@ -75,15 +75,15 @@ def execute_cmd(host, commands):
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    print "Connecting to " + host
+    print("Connecting to " + host)
     c.connect( hostname = host, username = "rke-user", pkey = k )
-    print "Connected to " + host
+    print("Connected to " + host)
 
     for command in commands:
-        print "Executing {}".format(command)
-        stdin , stdout, stderr = c.exec_command(command)
-        print stdout.read()
-        print stderr.read()
+        print("Executing {}".format(command))
+        stdin, stdout, stderr = c.exec_command(command)
+        print(stdout.read())
+        print(stderr.read())
 
     return
     {
