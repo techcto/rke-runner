@@ -266,6 +266,7 @@ def run(event, context):
                         print(str(e))
                         return responseData
             except BaseException as e:
+                print(str(e))
                 print("Something went wrong! Complete Lifecycle Event")
                 response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 # time.sleep(15)
