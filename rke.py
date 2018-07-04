@@ -12,6 +12,7 @@ LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 ### In order to get permissions right, we have to copy them to /tmp
 BIN_DIR = '/tmp/bin'
 OPENSSL = '/usr/bin/openssl'
+SCP = '/usr/bin/scp'
 SUCCESS = "SUCCESS"
 FAILED = "FAILED"
 
@@ -53,6 +54,10 @@ def reindent(s, numSpaces):
 
 def openssl(*args):
     cmdline = [OPENSSL] + list(args)
+    subprocess.check_call(cmdline)
+
+def scp(*args):
+    cmdline = [SCP] + list(args)
     subprocess.check_call(cmdline)
 
 def bucket_folder_exists(client, bucket, path_prefix):
@@ -237,7 +242,7 @@ def run(event, context):
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 print("Login to ETCD instance and copy backup to tmp")
-                subprocess.check_call(['scp', '-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot'], shell=False, stderr=subprocess.STDOUT)
+                scp(['-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot'])
 
                 print("Upload snapshot to S3")
                 s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
