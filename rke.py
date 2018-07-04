@@ -69,7 +69,7 @@ def bucket_folder_exists(client, bucket, path_prefix):
         return True
     return False
 
-def sshCmd(host, commands):
+def execute_cmd(host, commands):
     
     k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
     c = paramiko.SSHClient()
@@ -79,11 +79,6 @@ def sshCmd(host, commands):
     c.connect( hostname = host, username = "rke-user", pkey = k )
     print "Connected to " + host
 
-    commands = [
-        "aws s3 cp s3://s3-bucket/scripts/HelloWorld.sh /home/ec2-user/HelloWorld.sh",
-        "chmod 700 /home/ec2-user/HelloWorld.sh",
-        "/home/ec2-user/HelloWorld.sh"
-        ]
     for command in commands:
         print "Executing {}".format(command)
         stdin , stdout, stderr = c.exec_command(command)
@@ -268,7 +263,7 @@ def run(event, context):
                 commands = [
                     "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
                 ]
-                sshCmd(asgInstances[0]['PublicIpAddress'], commands)
+                execute_cmd(asgInstances[0]['PublicIpAddress'], commands)
 
                 # print("Upload snapshot to S3")
                 # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
