@@ -7,6 +7,7 @@ phases:
       - echo Compiling the Python code...
       - apt-get update -y
       - apt-get -y install zip
+      - pip install paramiko
   post_build:
     commands:
       - zip -r S3initRKE.zip .

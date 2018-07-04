@@ -1,6 +1,7 @@
 import boto3,json,os,time,subprocess,base64,shutil
 from botocore.vendored import requests
 from io import StringIO
+import paramiko
 
 ec2Client = boto3.client('ec2')
 autoscalingClient = boto3.client('autoscaling')
@@ -56,10 +57,6 @@ def openssl(*args):
     cmdline = [OPENSSL] + list(args)
     subprocess.check_call(cmdline)
 
-def scp(*args):
-    cmdline = [SCP] + list(args)
-    subprocess.check_call(cmdline)
-
 def bucket_folder_exists(client, bucket, path_prefix):
     # make path_prefix exact match and not path/to/folder*
     if list(path_prefix)[-1] is not '/':
@@ -71,6 +68,32 @@ def bucket_folder_exists(client, bucket, path_prefix):
     if response:
         return True
     return False
+
+def sshCmd(host, commands):
+    
+    k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
+    c = paramiko.SSHClient()
+    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    print "Connecting to " + host
+    c.connect( hostname = host, username = "rke-user", pkey = k )
+    print "Connected to " + host
+
+    commands = [
+        "aws s3 cp s3://s3-bucket/scripts/HelloWorld.sh /home/ec2-user/HelloWorld.sh",
+        "chmod 700 /home/ec2-user/HelloWorld.sh",
+        "/home/ec2-user/HelloWorld.sh"
+        ]
+    for command in commands:
+        print "Executing {}".format(command)
+        stdin , stdout, stderr = c.exec_command(command)
+        print stdout.read()
+        print stderr.read()
+
+    return
+    {
+        'message' : "Script execution completed. See Cloudwatch logs for complete output"
+    }
 
 def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
     responseUrl = event['ResponseURL']
@@ -242,10 +265,13 @@ def run(event, context):
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 print("Login to ETCD instance and copy backup to tmp")
-                scp('-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
+                commands = [
+                    "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
+                ]
+                sshCmd(asgInstances[0]['PublicIpAddress'], commands)
 
-                print("Upload snapshot to S3")
-                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                # print("Upload snapshot to S3")
+                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
                 print("Run RKE / Update Cluster")
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
