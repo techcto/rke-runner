@@ -201,11 +201,10 @@ def run(event, context):
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
-        print("snsMessage")
-        print(snsMessage)
         lifecycleHookName=snsMessage['LifecycleHookName']
         lifecycleActionToken=snsMessage['LifecycleActionToken']
         lifecycleTransition=snsMessage['LifecycleTransition']
+        print("snsMessage" + snsMessage)
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
             print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
@@ -233,10 +232,15 @@ def run(event, context):
                 print("Init RKE")
                 _init_bin('rke')
 
-                # print("Backup ETCD to S3")
-                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--config', '/tmp/config.yaml']
-                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                print("Backup ETCD")
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+
+                print("Login to ETCD instance and copy backup to tmp")
+                subprocess.check_call(['scp', '-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot, /tmp/etcdsnapshot])
+
+                print("Upload snapshot to S3")
+                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
                 print("Run RKE / Update Cluster")
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
