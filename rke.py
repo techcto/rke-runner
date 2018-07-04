@@ -69,6 +69,23 @@ def bucket_folder_exists(client, bucket, path_prefix):
         return True
     return False
 
+def download_file(host, downloadFrom, downloadTo):
+    k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
+    c = paramiko.SSHClient()
+    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    print("Connecting to " + host)
+    c.connect( hostname = host, username = "rke-user", pkey = k )
+    print("Connected to " + host)
+
+    sftp = c.open_sftp()
+    sftp.get(downloadFrom, downloadTo)
+
+    return
+    {
+        'message' : "Script execution completed. See Cloudwatch logs for complete output"
+    }
+
 def execute_cmd(host, commands):
     
     k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
@@ -260,13 +277,14 @@ def run(event, context):
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 print("Login to ETCD instance and copy backup to tmp")
-                commands = [
-                    "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
-                ]
-                execute_cmd(asgInstances[0]['PublicIpAddress'], commands)
+                # commands = [
+                #     "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
+                # ]
+                # execute_cmd(asgInstances[0]['PublicIpAddress'], commands)
+                download_file("/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
 
-                # print("Upload snapshot to S3")
-                # s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                print("Upload snapshot to S3")
+                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
                 print("Run RKE / Update Cluster")
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
