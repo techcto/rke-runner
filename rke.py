@@ -277,11 +277,16 @@ def run(event, context):
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 print("Login to ETCD instance and copy backup to tmp")
-                # commands = [
-                #     "aws s3 cp /opt/rke/etcd-snapshots/etcdsnapshot s3://" + rkeS3Bucket + "/etcdsnapshot",
-                # ]
-                # execute_cmd(asgInstances[0]['PublicIpAddress'], commands)
-                download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                try:
+                    download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                except BaseException as e:
+                    print(str(e))
+                    print("Try next instance")
+                    try:
+                        download_file(asgInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                    except BaseException as e:
+                        print(str(e))
+                        print("No go.  Good luck.  I hope you have other backups.")
 
                 print("Upload snapshot to S3")
                 s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
@@ -290,10 +295,11 @@ def run(event, context):
                 cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
-                # print("Restore ETCD snapshot from S3")
-                # s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-                # cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                # subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+                print("Restore ETCD snapshot")
+                s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 try:
                     #If Lambda executed from Lifecycle Event, issue success command
@@ -337,13 +343,9 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
                 '\n'
                 'nodes:\n')
 
-    print("Get instance count")
     instanceCount = 0;
     for instance in asgInstances:
-        if (instanceCount<3):
-            role = 'etcd,controlplane,worker'
-        else:
-            role = 'worker'
+        role = 'etcd,controlplane,worker'
         instanceCount += 1
 
         rkeConfig += ('  - address: ' + instance['PublicIpAddress'] + '\n'
@@ -353,6 +355,7 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
         rkeConfig += reindent(instancePEM, 8)
         rkeConfig += '\n'
 
+    print(instanceCount + " instances in cluster")
     print("Finalize config yaml")
     #For every node that has the etcd role, these backups are saved to /opt/rke/etcd-snapshots/.
     rkeConfig += ('\n'
