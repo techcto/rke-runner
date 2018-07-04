@@ -237,7 +237,7 @@ def run(event, context):
                 subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
 
                 print("Login to ETCD instance and copy backup to tmp")
-                subprocess.check_call(['scp', '-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot'])
+                subprocess.check_call(['scp', '-i', '/tmp/rsa.pem', 'rke-user@' + asgInstances[0]['PublicIpAddress'] + ':/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot'], , shell=False, stderr=subprocess.STDOUT)
 
                 print("Upload snapshot to S3")
                 s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
