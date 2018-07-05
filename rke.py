@@ -299,17 +299,19 @@ def run(event, context):
             print("Upload RKE config to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
-            print("Run RKE / Update Cluster")
+            print("Start: RKE / Update Cluster")
             cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+            print("Finish: RKE / Update Cluster")
 
-            try:
-                print("Restore ETCD snapshot")
-                s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-            except BaseException as e:
-                print(str(e))
+            if os.path.isfile('/tmp/etcdsnapshot'):
+                try:
+                    print("Restore ETCD snapshot")
+                    s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+                    cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+                    subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+                except BaseException as e:
+                    print(str(e))
 
             try:
                 #If Lambda executed from Lifecycle Event, issue success command
