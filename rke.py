@@ -193,7 +193,7 @@ def generateCertificates(FQDN):
     return rkeCrts
 
 #Start App
-def getActiveInstances(asgName):
+def setActiveInstances(asgName):
     activeInstances = []
     newInstances = []
 
