@@ -198,8 +198,8 @@ def getActiveInstances(asgName):
     }]
 
     asgInstances = {"active", "new"}
-    asgInstances["active"] = []
-    asgInstances["new"] = []
+    asgInstances["active"] = {}
+    asgInstances["new"] = {}
 
     print("Print ASG Instances")
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
