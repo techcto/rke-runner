@@ -20,6 +20,7 @@ FAILED = "FAILED"
 activeInstances = []
 newInstances = []
 
+
 #Define Utility Scripts
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
