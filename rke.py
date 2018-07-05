@@ -20,7 +20,6 @@ FAILED = "FAILED"
 activeInstances = []
 newInstances = []
 
-
 #Define Utility Scripts
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
@@ -226,6 +225,8 @@ def setActiveInstances(asgName):
 
 def run(event, context):
     print("Start App")
+    print(event)
+    print(context)
     instanceUser=os.environ['InstanceUser']
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
@@ -268,30 +269,32 @@ def run(event, context):
             print("Init RKE")
             _init_bin('rke')
 
-            print("Generate RKE ETCD back config")
-            generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
-
-            print("Backup ETCD")
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
-            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-
-            print("Login to ETCD instance and copy backup to tmp")
             try:
+                #Step 1: Try to backup ETCD and upload to S3
+                print("Generate RKE ETCD backup config")
+                generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+
+                print("Backup ETCD")
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+            except BaseException as e:
+                print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed.")
+                print(str(e))
+
+            try:
+                print("Login to ETCD instance and copy backup to tmp")
                 download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+
+                print("Upload snapshot to S3")
+                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
             except BaseException as e:
                 print(str(e))
-                print("Try next instance")
-                try:
-                    download_file(activeInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
-                except BaseException as e:
-                    print(str(e))
-                    print("No go.  Good luck.  I hope you have other backups.")
+                print("No go.  Good luck.  I hope you have other backups.")
 
-            print("Upload snapshot to S3")
-            s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
+            #Step 2: Generate config file for RKE and add/update kubernetes cluster
             print("Generate RKE config")
-            generateRKEConfig(activeInstances + newInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+            generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
             print("Upload RKE config to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
@@ -300,11 +303,13 @@ def run(event, context):
             cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
 
-            print("Restore ETCD snapshot")
-            s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+            try:
+                print("Restore ETCD snapshot")
+                s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
+                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+            except BaseException as e:
+                print(str(e))
 
             try:
                 #If Lambda executed from Lifecycle Event, issue success command
