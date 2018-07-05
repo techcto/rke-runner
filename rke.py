@@ -194,8 +194,6 @@ def generateCertificates(FQDN):
 
 #Start App
 def setActiveInstances(asgName):
-    activeInstances = []
-    newInstances = []
 
     #Get all instances for an ASG
     filters = [{  
