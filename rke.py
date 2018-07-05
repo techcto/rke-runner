@@ -17,6 +17,9 @@ SCP = '/usr/bin/scp'
 SUCCESS = "SUCCESS"
 FAILED = "FAILED"
 
+activeInstances = []
+newInstances = []
+
 #Define Utility Scripts
 def publishSNSMessage(snsMessage,snsTopicArn):
     response = snsClient.publish(TopicArn=snsTopicArn,Message=json.dumps(snsMessage),Subject='Rebalancing')
@@ -191,15 +194,14 @@ def generateCertificates(FQDN):
 
 #Start App
 def getActiveInstances(asgName):
+    activeInstances = []
+    newInstances = []
+
     #Get all instances for an ASG
     filters = [{  
         'Name': 'tag:aws:autoscaling:groupName',
         'Values': [asgName]
     }]
-
-    asgInstances = {"active", "new"}
-    asgInstances["active"] = {}
-    asgInstances["new"] = {}
 
     print("Print ASG Instances")
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
@@ -217,12 +219,11 @@ def getActiveInstances(asgName):
                 print(asgInstance)
                 if (asgInstance['LifecycleState'] == 'InService'):   
                     print("This instance is good to go!")
-                    asgInstances["active"].append(instance)
+                    activeInstances.append(instance)
                 elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
                     print("We have a new instance.  Welcome!")
-                    asgInstances["new"].append(instance)
+                    newInstances.append(instance)
 
-    return asgInstances
 
 def run(event, context):
     print("Start App")
@@ -258,9 +259,9 @@ def run(event, context):
         print(str(e))
 
     print("Get Active Instances")
-    asgInstances = getActiveInstances(asgName)
+    setActiveInstances(asgName)
 
-    if asgInstances:
+    if activeInstances:
         print("Generate / Get certificates")
         rkeCrts = generateCertificates(FQDN)
 
@@ -269,7 +270,7 @@ def run(event, context):
             _init_bin('rke')
 
             print("Generate RKE ETCD back config")
-            generateRKEConfig(asgInstances["active"],instanceUser,instancePEM,FQDN,rkeCrts)
+            generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
             print("Backup ETCD")
             cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
@@ -277,12 +278,12 @@ def run(event, context):
 
             print("Login to ETCD instance and copy backup to tmp")
             try:
-                download_file(asgInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
             except BaseException as e:
                 print(str(e))
                 print("Try next instance")
                 try:
-                    download_file(asgInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+                    download_file(activeInstances[1]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
                 except BaseException as e:
                     print(str(e))
                     print("No go.  Good luck.  I hope you have other backups.")
@@ -291,7 +292,7 @@ def run(event, context):
             s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
 
             print("Generate RKE config")
-            generateRKEConfig(asgInstances["active"] + asgInstances["new"],instanceUser,instancePEM,FQDN,rkeCrts)
+            generateRKEConfig(activeInstances + newInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
             print("Upload RKE config to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
