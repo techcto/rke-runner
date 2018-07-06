@@ -104,6 +104,7 @@ def upload_file(host, downloadFrom, downloadTo):
     print("Connected to " + host)
 
     sftp = c.open_sftp()
+    sftp.remove(downloadTo)
     sftp.put(downloadFrom, downloadTo)
 
     return
