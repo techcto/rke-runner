@@ -202,6 +202,8 @@ def downloadRSAKey(rkeS3Bucket):
     with open("/tmp/rsa.pem", "rb") as rsa:
         instancePEM = rsa.read().decode("utf-8")
 
+    return instancePEM
+
 def takeSnapshot(rkeS3Bucket):
     try:
         print("Backup ETCD")
@@ -259,7 +261,7 @@ def run(event, context):
     _init_bin('rke')
 
     #Download Instance RSA Key from S3 so RKE can access instances
-    downloadRSAKey(rkeS3Bucket)
+    instancePEM = downloadRSAKey(rkeS3Bucket)
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
     try:
