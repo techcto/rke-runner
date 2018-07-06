@@ -3,6 +3,9 @@ from botocore.vendored import requests
 from io import StringIO
 import paramiko
 
+# https://rancher.com/docs/rancher/v2.x/en/installation/ha-server-install-external-lb/
+# https://rancher.com/docs/rancher/v2.x/en/upgrades/ha-server-upgrade/
+
 ec2Client = boto3.client('ec2')
 autoscalingClient = boto3.client('autoscaling')
 snsClient = boto3.client('sns')
@@ -89,6 +92,23 @@ def download_file(host, downloadFrom, downloadTo):
         'message' : "Script execution completed. See Cloudwatch logs for complete output"
     }
 
+def upload_file(host, downloadFrom, downloadTo):
+    k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
+    c = paramiko.SSHClient()
+    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    print("Connecting to " + host)
+    c.connect( hostname = host, username = "rke-user", pkey = k )
+    print("Connected to " + host)
+
+    sftp = c.open_sftp()
+    sftp.put(downloadFrom, downloadTo)
+
+    return
+    {
+        'message' : "Script execution completed. See Cloudwatch logs for complete output"
+    }
+
 def execute_cmd(host, commands):
     
     k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
@@ -142,56 +162,6 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
     except Exception as e:
         print("send(..) failed executing requests.put(..): " + str(e))
 
-def generateCertificates(FQDN):
-    #Create CA Signing Authority
-    os.environ['HOME'] = '/tmp'
-    rkeS3Bucket=os.environ['rkeS3Bucket']
-    openssl("version")
-    s3 = boto3.resource('s3')
-
-    try:
-        s3.Object(rkeS3Bucket, 'server.crt').load()
-    except BaseException as e:
-        print("The certs do not exist")
-
-        #Create CA
-        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
-
-        #Create Certificate
-        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN, "-keyout", "/tmp/server.key", "-out", "/tmp/server.csr")
-
-        #Sign the certificate from the CA
-        openssl("x509", "-req", "-days", "3650", "-in", "/tmp/server.csr", "-CA", "/tmp/ca.crt", "-CAkey", "/tmp/ca.key", "-set_serial", "01", "-out", "/tmp/server.crt")
-
-        #Upload certs to s3
-        try:
-            print("Upload certs to S3")
-            s3.meta.client.upload_file('/tmp/server.crt', rkeS3Bucket, 'server.crt')
-            s3.meta.client.upload_file('/tmp/server.key', rkeS3Bucket, 'server.key')
-            s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
-        except BaseException as e:
-            print(str(e))
-    else:
-        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
-        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
-        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
-
-    rkeCrts={}
-
-    #read cert file
-    with open("/tmp/server.crt", "rb") as crt:
-        rkeCrts['crt'] = base64.b64encode(crt.read())
-
-    #read key file
-    with open("/tmp/server.key", "rb") as key:
-        rkeCrts['key'] = base64.b64encode(key.read())
-
-    #read ca file
-    with open("/tmp/ca.crt", "rb") as ca:
-        rkeCrts['ca'] = base64.b64encode(ca.read())
-
-    return rkeCrts
-
 #Start App
 def setActiveInstances(asgName):
     activeInstances.clear()
@@ -224,6 +194,55 @@ def setActiveInstances(asgName):
                     print("We have a new instance.  Welcome!")
                     newInstances.append(instance)
 
+def downloadRSAKey(rkeS3Bucket):
+    #Download Instance RSA Key from S3 so RKE can do it's thing.
+    print("Copy RSA from S3 to local")
+    s3 = boto3.resource('s3')
+    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
+    with open("/tmp/rsa.pem", "rb") as rsa:
+        instancePEM = rsa.read().decode("utf-8")
+
+def takeSnapshot(rkeS3Bucket):
+    try:
+        print("Backup ETCD")
+        cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
+        subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+    except BaseException as e:
+        print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed.")
+        print(str(e))
+        return False
+
+    try:
+        print("Login to ETCD instance and copy backup to tmp")
+        download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+        print("Upload snapshot to S3")
+        s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+        return True
+    except BaseException as e:
+        print(str(e))
+        print("No go.  Good luck.  I hope you have other backups.")
+        return False
+    
+def uploadSnapshot(instances):
+    print("Upload etcdsnapshot to all active instances")
+    for instance in instances:
+        upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
+
+def restoreSnapshot(rkeS3Bucket):
+    if os.path.isfile('/tmp/etcdsnapshot'):
+        try:
+        print("Restore ETCD snapshot")
+        s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+        cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot', '--config', '/tmp/config.yaml']
+        subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+    except BaseException as e:
+        print(str(e))
+
+def rkeUp():
+    print("Start: RKE / Update Cluster")
+    cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
+    subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
+    print("Finish: RKE / Update Cluster")
 
 def run(event, context):
     print("Start App")
@@ -236,12 +255,11 @@ def run(event, context):
     pendingEc2s=0
     responseData = {}
 
-    #Download Instance RSA Key from S3
-    print("Copy RSA from S3 to local")
-    s3 = boto3.resource('s3')
-    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
-    with open("/tmp/rsa.pem", "rb") as rsa:
-        instancePEM = rsa.read().decode("utf-8")
+    print("Init RKE")
+    _init_bin('rke')
+
+    #Download Instance RSA Key from S3 so RKE can access instances
+    downloadRSAKey(rkeS3Bucket):
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
     try:
@@ -260,6 +278,7 @@ def run(event, context):
     except BaseException as e:
         print(str(e))
 
+    #Ask AWS what instances are ready to go.  If any pending, we should come back and try again.
     print("Get Active Instances")
     setActiveInstances(asgName)
 
@@ -268,52 +287,28 @@ def run(event, context):
         rkeCrts = generateCertificates(FQDN)
 
         try:
-            print("Init RKE")
-            _init_bin('rke')
+            print("Generate RKE ETCD backup config")
+            generateRKEConfig(activenIstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
-            try:
-                #Step 1: Try to backup ETCD and upload to S3
-                print("Generate RKE ETCD backup config")
-                generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+            print("Take snapshot from remaining healthy instaces and upload externally to S3")
+            snapshotStatus = takeSnapshot(rkeS3Bucket)
 
-                print("Backup ETCD")
-                cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
-                subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-            except BaseException as e:
-                print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed.")
-                print(str(e))
+            if snapshotStatus:
+                print("Upload latest snapshot to all instances")
+                uploadSnapshot(activenIstances)
 
-            try:
-                print("Login to ETCD instance and copy backup to tmp")
-                download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
-
-                print("Upload snapshot to S3")
-                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
-            except BaseException as e:
-                print(str(e))
-                print("No go.  Good luck.  I hope you have other backups.")
-
-
-            #Step 2: Generate config file for RKE and add/update kubernetes cluster
-            print("Generate RKE config")
+            print("Generate new RKE config with all active instances")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
-
-            print("Upload RKE config to S3")
+            
+            print("Upload latest config file to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
-            print("Start: RKE / Update Cluster")
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
-            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
-            print("Finish: RKE / Update Cluster")
+            if snapshotStatus:
+                print("Restore instances with latest snapshot.")
+                restoreSnapshot(rkeS3Bucket)
 
-            if os.path.isfile('/tmp/etcdsnapshot'):
-                try:
-                    print("Restore ETCD snapshot")
-                    s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-                    cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/tmp/etcdsnapshot', '--config', '/tmp/config.yaml']
-                    subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-                except BaseException as e:
-                    print(str(e))
+            print("Install / Update Kubernetes cluster using RKE")
+            rkeUp()
 
             try:
                 #If Lambda executed from Lifecycle Event, issue success command
@@ -501,3 +496,54 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     outF = open('/tmp/config.yaml', 'w')
     outF.write(rkeConfig)
     outF.close()
+
+def generateCertificates(FQDN):
+    print("Generate / Get certificates")
+    #Create CA Signing Authority
+    os.environ['HOME'] = '/tmp'
+    rkeS3Bucket=os.environ['rkeS3Bucket']
+    openssl("version")
+    s3 = boto3.resource('s3')
+
+    try:
+        s3.Object(rkeS3Bucket, 'server.crt').load()
+    except BaseException as e:
+        print("The certs do not exist")
+
+        #Create CA
+        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
+
+        #Create Certificate
+        openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=" +FQDN, "-keyout", "/tmp/server.key", "-out", "/tmp/server.csr")
+
+        #Sign the certificate from the CA
+        openssl("x509", "-req", "-days", "3650", "-in", "/tmp/server.csr", "-CA", "/tmp/ca.crt", "-CAkey", "/tmp/ca.key", "-set_serial", "01", "-out", "/tmp/server.crt")
+
+        #Upload certs to s3
+        try:
+            print("Upload certs to S3")
+            s3.meta.client.upload_file('/tmp/server.crt', rkeS3Bucket, 'server.crt')
+            s3.meta.client.upload_file('/tmp/server.key', rkeS3Bucket, 'server.key')
+            s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
+        except BaseException as e:
+            print(str(e))
+    else:
+        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
+        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
+        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
+
+    rkeCrts={}
+
+    #read cert file
+    with open("/tmp/server.crt", "rb") as crt:
+        rkeCrts['crt'] = base64.b64encode(crt.read())
+
+    #read key file
+    with open("/tmp/server.key", "rb") as key:
+        rkeCrts['key'] = base64.b64encode(key.read())
+
+    #read ca file
+    with open("/tmp/ca.crt", "rb") as ca:
+        rkeCrts['ca'] = base64.b64encode(ca.read())
+
+    return rkeCrts
