@@ -247,6 +247,16 @@ def rkeUp():
     subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT)
     print("Finish: RKE / Update Cluster")
 
+def restartKubernetes(instances):
+    commands = {
+        "docker restart kube-apiserver kubelet kube-controller-manager kube-scheduler kube-proxy",
+        "docker ps | grep flannel | cut -f 1 -d " " | xargs docker restart",
+        "docker ps | grep calico | cut -f 1 -d " " | xargs docker restart",
+    }
+
+    for instance in instances:
+        execute_cmd(instance['PublicIpAddress'], commands)
+
 def run(event, context):
     print("Start App")
     print(event)
@@ -312,6 +322,9 @@ def run(event, context):
 
             print("Install / Update Kubernetes cluster using RKE")
             rkeUp()
+
+            print("Restart the Kubernetes components on all cluster nodes to prevent potential etcd conflicts")
+            restartKubernetes(activeInstances)
 
             try:
                 #If Lambda executed from Lifecycle Event, issue success command
