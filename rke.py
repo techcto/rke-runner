@@ -11,6 +11,8 @@ autoscalingClient = boto3.client('autoscaling')
 snsClient = boto3.client('sns')
 lambdaClient = boto3.client('lambda')
 
+s3 = boto3.resource('s3')
+
 LAMBDA_TASK_ROOT = os.environ.get('LAMBDA_TASK_ROOT', os.path.dirname(os.path.abspath(__file__)))
 LIB_DIR = os.path.join(LAMBDA_TASK_ROOT, 'lib')
 ### In order to get permissions right, we have to copy them to /tmp
@@ -197,7 +199,6 @@ def setActiveInstances(asgName):
 def downloadRSAKey(rkeS3Bucket):
     #Download Instance RSA Key from S3 so RKE can do it's thing.
     print("Copy RSA from S3 to local")
-    s3 = boto3.resource('s3')
     s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
     with open("/tmp/rsa.pem", "rb") as rsa:
         instancePEM = rsa.read().decode("utf-8")
