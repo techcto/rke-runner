@@ -318,8 +318,14 @@ def run(event, context):
                 print("Restore instances with latest snapshot")
                 restoreSnapshot(rkeS3Bucket)
 
+            print("Download RKE generated config")
+            s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
+
             print("Install / Update Kubernetes cluster using RKE")
             rkeUp()
+
+            print("Upload RKE generated config")
+            s3.meta.client.upload_file('/tmp/kube_config_config.yaml', rkeS3Bucket, 'kube_config_config.yaml')
 
             print("Restart the Kubernetes components on all cluster nodes to prevent potential etcd conflicts")
             restartKubernetes(activeInstances)
