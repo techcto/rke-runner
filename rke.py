@@ -231,12 +231,12 @@ def uploadSnapshot(instances):
 def restoreSnapshot(rkeS3Bucket):
     if os.path.isfile('/tmp/etcdsnapshot'):
         try:
-        print("Restore ETCD snapshot")
-        s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-        cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot', '--config', '/tmp/config.yaml']
-        subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
-    except BaseException as e:
-        print(str(e))
+            print("Restore ETCD snapshot")
+            s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot', '--config', '/tmp/config.yaml']
+            subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+        except BaseException as e:
+            print(str(e))
 
 def rkeUp():
     print("Start: RKE / Update Cluster")
