@@ -259,7 +259,7 @@ def run(event, context):
     _init_bin('rke')
 
     #Download Instance RSA Key from S3 so RKE can access instances
-    downloadRSAKey(rkeS3Bucket):
+    downloadRSAKey(rkeS3Bucket)
 
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
     try:
