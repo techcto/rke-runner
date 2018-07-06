@@ -288,14 +288,14 @@ def run(event, context):
 
         try:
             print("Generate RKE ETCD backup config")
-            generateRKEConfig(activenIstances,instanceUser,instancePEM,FQDN,rkeCrts)
+            generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
             print("Take snapshot from remaining healthy instaces and upload externally to S3")
             snapshotStatus = takeSnapshot(rkeS3Bucket)
 
             if snapshotStatus:
                 print("Upload latest snapshot to all instances")
-                uploadSnapshot(activenIstances)
+                uploadSnapshot(activeInstances)
 
             print("Generate new RKE config with all active instances")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
