@@ -306,18 +306,16 @@ def run(event, context):
             print("Take snapshot from remaining healthy instaces and upload externally to S3")
             snapshotStatus = takeSnapshot(rkeS3Bucket)
 
-            if snapshotStatus:
-                print("Upload latest snapshot to all instances")
-                uploadSnapshot(activeInstances)
-
-            print("Generate new RKE config with all active instances")
+            print("Generate Kubernetes Cluster RKE config with all active instances")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
             
             print("Upload latest config file to S3")
             s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
 
             if snapshotStatus:
-                print("Restore instances with latest snapshot.")
+                print("Upload latest snapshot to all instances")
+                uploadSnapshot(activeInstances)
+                print("Restore instances with latest snapshot")
                 restoreSnapshot(rkeS3Bucket)
 
             print("Install / Update Kubernetes cluster using RKE")
