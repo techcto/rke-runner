@@ -328,8 +328,8 @@ def run(event, context):
                     print("Restore instances with latest snapshot")
                     restoreSnapshot(rkeS3Bucket)
 
-            print("Download RKE generated config")
-            s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
+            # print("Download RKE generated config")
+            # s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
 
             print("Install / Update Kubernetes cluster using RKE")
             rkeUp()
