@@ -231,7 +231,7 @@ def uploadSnapshot(instances):
     for instance in instances:
         print("Set permissions on instance for file before uploading")
         try:
-            execute_cmd(instance['PublicIpAddress'], {"chown rke-user.rke-user /opt/rke/etcd-snapshots/etcdsnapshot"})
+            execute_cmd(instance['PublicIpAddress'], {"sudo chown rke-user.rke-user /opt/rke/etcd-snapshots/etcdsnapshot"})
             upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
         except BaseException as e:
             print(str(e))
