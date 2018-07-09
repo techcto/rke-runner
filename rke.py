@@ -106,10 +106,6 @@ def upload_file(host, downloadFrom, downloadTo):
     #Open connection
     sftp = c.open_sftp()
 
-    #Delete previous version of file
-    print("Delete " + downloadTo)
-    sftp.remove(downloadTo)
-
     #Upload file
     print("Upload from " + downloadFrom + " to " + downloadTo)
     sftp.put(downloadFrom, downloadTo)
@@ -239,7 +235,7 @@ def uploadSnapshot(instances):
     for instance in instances:
         print("Upload etcdbackup to each instance")
         try:
-            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
+            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot_restore')
         except BaseException as e:
             print(str(e))
 
@@ -248,7 +244,7 @@ def restoreSnapshot(rkeS3Bucket):
         try:
             print("Restore ETCD snapshot")
             s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot', '--config', '/tmp/config.yaml']
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot_restore', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
         except BaseException as e:
             print(str(e))
