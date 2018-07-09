@@ -107,9 +107,11 @@ def upload_file(host, downloadFrom, downloadTo):
     sftp = c.open_sftp()
 
     #Set permission
+    print("Set permissions on " + downloadTo)
     sftp.chown(downloadTo, "rke-user", "rke-user")
 
     #Upload file
+    print("Upload from " + downloadFrom + " to " + downloadTo)
     sftp.put(downloadFrom, downloadTo)
 
     return
@@ -235,7 +237,7 @@ def takeSnapshot(rkeS3Bucket):
     
 def uploadSnapshot(instances):
     for instance in instances:
-        print("Set permissions on instance for file before uploading")
+        print("Upload etcdbackup to each instance")
         try:
             upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
         except BaseException as e:
