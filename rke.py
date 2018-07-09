@@ -235,7 +235,7 @@ def uploadSnapshot(instances):
     for instance in instances:
         print("Upload etcdbackup to each instance")
         try:
-            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot_restore')
+            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/home/rke-user/etcdsnapshot_restore')
             return True
         except BaseException as e:
             print(str(e))
