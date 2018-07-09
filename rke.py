@@ -230,6 +230,8 @@ def takeSnapshot(rkeS3Bucket):
 def uploadSnapshot(instances):
     print("Upload etcdsnapshot to all active instances")
     for instance in instances:
+        print("Set permissions on instance for file before uploading")
+        execute_cmd(host, {"chown -Rf rke-user.rke-user /opt/rke/etcd-snapshots/etcdsnapshot"})
         upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
 
 def restoreSnapshot(rkeS3Bucket):
