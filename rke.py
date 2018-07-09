@@ -103,7 +103,13 @@ def upload_file(host, downloadFrom, downloadTo):
     c.connect( hostname = host, username = "rke-user", pkey = k )
     print("Connected to " + host)
 
+    #Open connection
     sftp = c.open_sftp()
+
+    #Set permission
+    sftp.chown(downloadTo, "rke-user", "rke-user")
+
+    #Upload file
     sftp.put(downloadFrom, downloadTo)
 
     return
@@ -231,7 +237,6 @@ def uploadSnapshot(instances):
     for instance in instances:
         print("Set permissions on instance for file before uploading")
         try:
-            execute_cmd(instance['PublicIpAddress'], {"sudo chown rke-user.rke-user /opt/rke/etcd-snapshots/etcdsnapshot"})
             upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
         except BaseException as e:
             print(str(e))
