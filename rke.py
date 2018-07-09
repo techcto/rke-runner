@@ -236,10 +236,10 @@ def uploadSnapshot(instances):
         print("Upload etcdbackup to each instance")
         try:
             upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/home/rke-user/etcdsnapshot_restore')
-            return True
         except BaseException as e:
             print(str(e))
             return False
+    return True
 
 def restoreSnapshot(rkeS3Bucket):
     if os.path.isfile('/tmp/etcdsnapshot'):
