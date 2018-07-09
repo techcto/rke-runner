@@ -112,7 +112,7 @@ def upload_file(host, downloadFrom, downloadTo):
     sftp.put(downloadFrom, downloadToTemp)
 
     print("Move from " + downloadToTemp + " to " + downloadTo)
-    execute_cmd(host, {"rm -f  downloadTo", "mv downloadToTemp downloadTo"})
+    execute_cmd(host, {"sudo rm -f  downloadTo", "sudo mv downloadToTemp downloadTo"})
 
     return
     {
