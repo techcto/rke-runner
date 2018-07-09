@@ -106,9 +106,13 @@ def upload_file(host, downloadFrom, downloadTo):
     #Open connection
     sftp = c.open_sftp()
 
-    #Upload file
-    print("Upload from " + downloadFrom + " to " + downloadTo)
-    sftp.put(downloadFrom, downloadTo)
+    #Upload file to homr dir
+    downloadToTemp = "/home/rke-user/tmp.file"
+    print("Upload from " + downloadFrom + " to " + downloadToTemp)
+    sftp.put(downloadFrom, downloadToTemp)
+
+    print("Move from " + downloadToTemp + " to " + downloadTo)
+    execute_cmd(host, {"rm -f  downloadTo", "mv downloadToTemp downloadTo"})
 
     return
     {
