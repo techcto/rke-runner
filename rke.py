@@ -278,6 +278,7 @@ def run(event, context):
     FQDN=os.environ['FQDN']
     rkeS3Bucket=os.environ['rkeS3Bucket']
     asgName=os.environ['CLUSTER']
+    s3 = boto3.resource('s3')
     pendingEc2s=0
     responseData = {}
 
@@ -312,11 +313,20 @@ def run(event, context):
         rkeCrts = generateCertificates(FQDN)
 
         try:
-            print("Generate RKE ETCD backup config")
-            generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
+            try:
+                s3.Object(rkeS3Bucket, 'kube_config_config.yaml').load()
+            except BaseException as e:
+                print("This is a fresh install")
+                snapshotStatus = False
+            else:
+                print("Generate RKE ETCD backup config")
+                generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
-            print("Take snapshot from running healthy instaces and upload externally to S3")
-            snapshotStatus = takeSnapshot(rkeS3Bucket)
+                print("Take snapshot from running healthy instaces and upload externally to S3")
+                snapshotStatus = takeSnapshot(rkeS3Bucket)
+
+                print("Download RKE generated config")
+                s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
 
             print("Generate Kubernetes Cluster RKE config with all active instances")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
@@ -330,9 +340,6 @@ def run(event, context):
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
                     restoreSnapshot(rkeS3Bucket)
-
-            # print("Download RKE generated config")
-            # s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
 
             print("Install / Update Kubernetes cluster using RKE")
             rkeUp()
@@ -559,6 +566,7 @@ def generateCertificates(FQDN):
             s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
         except BaseException as e:
             print(str(e))
+            return False
     else:
         print("Download previously generated ssl certificates from S3")
         s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
