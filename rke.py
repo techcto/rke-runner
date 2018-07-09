@@ -112,7 +112,7 @@ def upload_file(host, downloadFrom, downloadTo):
     sftp.put(downloadFrom, downloadToTemp)
 
     print("Move from " + downloadToTemp + " to " + downloadTo)
-    execute_cmd(host, {"rm -f  downloadTo", "mv downloadToTemp downloadTo"})
+    execute_cmd(host, {"rm -f  " + downloadTo, "mv " + downloadToTemp +" " + downloadTo})
 
     return
     {
@@ -296,6 +296,12 @@ def run(event, context):
         lifecycleActionToken=snsMessage['LifecycleActionToken']
         lifecycleTransition=snsMessage['LifecycleTransition']
         print("snsMessage" + snsMessage)
+
+        if snsMessage['Event'] == "autoscaling:TEST_NOTIFICATION":
+            print("Ignore test event fire at beginning of cloudformation init")
+            print("Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            return True
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
             print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
