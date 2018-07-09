@@ -236,8 +236,10 @@ def uploadSnapshot(instances):
         print("Upload etcdbackup to each instance")
         try:
             upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot_restore')
+            return True
         except BaseException as e:
             print(str(e))
+            return False
 
 def restoreSnapshot(rkeS3Bucket):
     if os.path.isfile('/tmp/etcdsnapshot'):
@@ -321,9 +323,10 @@ def run(event, context):
 
             if snapshotStatus:
                 print("Upload latest snapshot to all instances")
-                uploadSnapshot(activeInstances)
-                print("Restore instances with latest snapshot")
-                restoreSnapshot(rkeS3Bucket)
+                uploadSnapshotStatus = uploadSnapshot(activeInstances)
+                if uploadSnapshotStatus:
+                    print("Restore instances with latest snapshot")
+                    restoreSnapshot(rkeS3Bucket)
 
             print("Download RKE generated config")
             s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
