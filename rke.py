@@ -246,7 +246,7 @@ def restoreSnapshot(rkeS3Bucket):
         try:
             print("Restore ETCD snapshot")
             s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', ' etcdsnapshot_restore', '--config', '/tmp/config.yaml']
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', '/home/rke-user/etcdsnapshot_restore', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
         except BaseException as e:
             print(str(e))
