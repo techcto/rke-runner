@@ -107,7 +107,7 @@ def upload_file(host, downloadFrom, downloadTo):
     sftp = c.open_sftp()
 
     #Upload file to homr dir
-    downloadToTemp = "/home/rke-user/tmp.file"
+    downloadToTemp = "/home/rke-user/etcdsnapshot_restore"
     print("Upload from " + downloadFrom + " to " + downloadToTemp)
     sftp.put(downloadFrom, downloadToTemp)
 
