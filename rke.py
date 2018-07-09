@@ -224,9 +224,9 @@ def takeSnapshot(rkeS3Bucket):
         print(str(e))
         return False
 
-    try:
+    try: 
         print("Login to ETCD instance and copy backup to local /tmp for Lambda")
-        download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
+        download_file(activeInstances[0]['PublicIpAddress'], '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
         print("Upload snapshot to S3")
         s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
         return True
@@ -239,7 +239,7 @@ def uploadSnapshot(instances):
     for instance in instances:
         print("Upload etcdbackup to each instance")
         try:
-            upload_file(instance['PublicIpAddress'], "/tmp/etcdsnapshot", "/opt/rke/etcd-snapshots/etcdsnapshot")
+            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
         except BaseException as e:
             print(str(e))
 
