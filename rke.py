@@ -106,9 +106,9 @@ def upload_file(host, downloadFrom, downloadTo):
     #Open connection
     sftp = c.open_sftp()
 
-    #Set permission
-    print("Set permissions on " + downloadTo)
-    sftp.chown(downloadTo, "rke-user", "rke-user")
+    #Delete previous version of file
+    print("Delete " + downloadTo)
+    sftp.remove(downloadTo)
 
     #Upload file
     print("Upload from " + downloadFrom + " to " + downloadTo)
