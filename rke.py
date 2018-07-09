@@ -104,7 +104,6 @@ def upload_file(host, downloadFrom, downloadTo):
     print("Connected to " + host)
 
     sftp = c.open_sftp()
-    sftp.remove(downloadTo)
     sftp.put(downloadFrom, downloadTo)
 
     return
@@ -176,7 +175,8 @@ def setActiveInstances(asgName):
         'Values': [asgName]
     }]
 
-    print("Print ASG Instances")
+    print("Print instances in autoscaling group")
+
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
         print(reservation['Instances'])
         for instance in reservation['Instances']:
@@ -188,7 +188,6 @@ def setActiveInstances(asgName):
             )
 
             for asgInstance in response['AutoScalingInstances']:
-                print("ASG Instance Status")
                 print(asgInstance)
                 if (asgInstance['LifecycleState'] == 'InService'):   
                     print("This instance is good to go!")
@@ -208,16 +207,17 @@ def downloadRSAKey(rkeS3Bucket):
 
 def takeSnapshot(rkeS3Bucket):
     try:
-        print("Backup ETCD")
+        print("ETCD is attempting to be backed up")
         cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
         subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+        print("ETCD has been successfully backed up to /opt/rke/etcd-snapshots/etcdsnapshot on the running kubernetes instance")
     except BaseException as e:
-        print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed.")
+        print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
         print(str(e))
         return False
 
     try:
-        print("Login to ETCD instance and copy backup to tmp")
+        print("Login to ETCD instance and copy backup to local /tmp for Lambda")
         download_file(activeInstances[0]['PublicIpAddress'], "/opt/rke/etcd-snapshots/etcdsnapshot", "/tmp/etcdsnapshot")
         print("Upload snapshot to S3")
         s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
@@ -293,7 +293,6 @@ def run(event, context):
         print(str(e))
 
     #Ask AWS what instances are ready to go.  If any pending, we should come back and try again.
-    print("Get Active Instances")
     setActiveInstances(asgName)
 
     if activeInstances:
@@ -304,7 +303,7 @@ def run(event, context):
             print("Generate RKE ETCD backup config")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
-            print("Take snapshot from remaining healthy instaces and upload externally to S3")
+            print("Take snapshot from running healthy instaces and upload externally to S3")
             snapshotStatus = takeSnapshot(rkeS3Bucket)
 
             print("Generate Kubernetes Cluster RKE config with all active instances")
@@ -382,7 +381,6 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
         rkeConfig += reindent(instancePEM, 8)
         rkeConfig += '\n'
 
-    print("Finalize config yaml")
     #For every node that has the etcd role, these backups are saved to /opt/rke/etcd-snapshots/.
     rkeConfig += ('\n'
     'services:\n'
@@ -517,9 +515,9 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     outF = open('/tmp/config.yaml', 'w')
     outF.write(rkeConfig)
     outF.close()
+    print("Write RKE config yaml to /tmp/config.yaml")
 
 def generateCertificates(FQDN):
-    print("Generate / Get certificates")
     #Create CA Signing Authority
     os.environ['HOME'] = '/tmp'
     rkeS3Bucket=os.environ['rkeS3Bucket']
@@ -529,7 +527,7 @@ def generateCertificates(FQDN):
     try:
         s3.Object(rkeS3Bucket, 'server.crt').load()
     except BaseException as e:
-        print("The certs do not exist")
+        print("Generate a new set of ssl certificates")
 
         #Create CA
         openssl("req", "-new", "-newkey", "rsa:4096", "-days", "3650", "-nodes", "-subj", "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=spacemade.com", "-x509", "-keyout", "/tmp/ca.key", "-out", "/tmp/ca.crt")
@@ -549,6 +547,7 @@ def generateCertificates(FQDN):
         except BaseException as e:
             print(str(e))
     else:
+        print("Download previously generated ssl certificates from S3")
         s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
         s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
         s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
