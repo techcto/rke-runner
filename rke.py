@@ -298,7 +298,6 @@ def checkEventStatus(event,asgName):
         lifecycleHookName=snsMessage['LifecycleHookName']
         lifecycleActionToken=snsMessage['LifecycleActionToken']
         lifecycleTransition=snsMessage['LifecycleTransition']
-        print(snsMessage)
 
         try:
             print("Ignore test event fire at beginning of cloudformation init")
