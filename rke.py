@@ -300,10 +300,14 @@ def checkEvent(event):
         lifecycleTransition=snsMessage['LifecycleTransition']
         print("snsMessage" + snsMessage)
 
-        if snsMessage['Event'] == "autoscaling:TEST_NOTIFICATION":
+        try:
             print("Ignore test event fire at beginning of cloudformation init")
-            print("Complete Lifecycle Event")
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            if snsMessage['Event'] == "autoscaling:TEST_NOTIFICATION":
+                print("Complete Lifecycle Event")
+                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+                return True
+        except BaseException as e:
+            print(str(e))
             return True
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
@@ -380,11 +384,11 @@ def run(event, context):
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
                     restoreStatus = restoreSnapshot(rkeS3Bucket)
-                    # print("Restart the Kubernetes components on all cluster nodes to prevent potential etcd conflicts")
-                    # restartKubernetes(activeInstances)
                     if restoreStatus == False:
                         print("Restore failed!")
                         print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
+                        print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
+                        restartKubernetes(activeInstances)
                         return False
 
             print("Install / Update Kubernetes cluster using RKE")
