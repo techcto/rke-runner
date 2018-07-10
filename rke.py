@@ -291,7 +291,7 @@ def restartKubernetes(instances):
         execute_cmd(instance['PublicIpAddress'], commands)
 
 def checkEvent(event):
-    #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
+    print("Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)")
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
