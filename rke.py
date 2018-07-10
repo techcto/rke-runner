@@ -132,8 +132,12 @@ def execute_cmd(host, commands):
     for command in commands:
         print("Executing {}".format(command))
         stdin, stdout, stderr = c.exec_command(command)
-        print(stdout.read())
-        print(stderr.read())
+        output = stdout.read()
+        if output:
+            print(output.decode("utf-8"))
+        errors = stderr.read()
+        if errors:
+            print(errors.decode("utf-8"))
 
     return
     {
@@ -186,7 +190,8 @@ def setActiveInstances(asgName):
     print("Print instances in autoscaling group")
 
     for reservation in ec2Client.describe_instances(Filters=filters)['Reservations']:
-        print(reservation['Instances'])
+        # print(reservation['Instances'])
+
         for instance in reservation['Instances']:
             #Check to see if instance is healthy
             response = autoscalingClient.describe_auto_scaling_instances(
@@ -196,7 +201,9 @@ def setActiveInstances(asgName):
             )
 
             for asgInstance in response['AutoScalingInstances']:
-                print(asgInstance)
+                #Pretty print json of instance from AWS autoscaling group
+                print(json.dumps(asgInstance, indent=4, sort_keys=True))
+
                 if (asgInstance['LifecycleState'] == 'InService'):   
                     print("This instance is good to go!")
                     activeInstances.append(instance)
@@ -220,8 +227,8 @@ def takeSnapshot(rkeS3Bucket):
         subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
         print("ETCD has been successfully backed up to /opt/rke/etcd-snapshots/etcdsnapshot on the running kubernetes instance")
     except BaseException as e:
-        print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
         print(str(e))
+        print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
         return False
 
     try: 
@@ -262,9 +269,9 @@ def rkeUp():
 
 def restartKubernetes(instances):
     commands = {
-        "docker restart kube-apiserver kubelet kube-controller-manager kube-scheduler kube-proxy",
-        "docker ps | grep flannel | cut -f 1 -d " " | xargs docker restart",
-        "docker ps | grep calico | cut -f 1 -d " " | xargs docker restart",
+        'docker restart kube-apiserver kubelet kube-controller-manager kube-scheduler kube-proxy',
+        'docker ps | grep flannel | cut -f 1 -d " " | xargs docker restart',
+        'docker ps | grep calico | cut -f 1 -d " " | xargs docker restart'
     }
 
     for instance in instances:
