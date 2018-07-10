@@ -111,8 +111,13 @@ def upload_file(host, downloadFrom, downloadTo):
     print("Upload from " + downloadFrom + " to " + downloadToTemp)
     sftp.put(downloadFrom, downloadToTemp)
 
-    print("Move from " + downloadToTemp + " to " + downloadTo)
-    execute_cmd(host, {"rm -f  " + downloadTo, "mv " + downloadToTemp +" " + downloadTo})
+    #Clean out old file and replace with new file
+    commands = [
+        'rm -f  ' + downloadTo,
+        'mv ' + downloadToTemp + ' ' + downloadTo,
+        'ls -al ' + downloadTo
+    ]
+    execute_cmd(host, commands)
 
     return
     {
@@ -220,27 +225,33 @@ def downloadRSAKey(rkeS3Bucket):
 
     return instancePEM
 
-def takeSnapshot(rkeS3Bucket):
+def takeSnapshot(instances, rkeS3Bucket):
     try:
         print("ETCD is attempting to be backed up")
         cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
         subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
         print("ETCD has been successfully backed up to /opt/rke/etcd-snapshots/etcdsnapshot on the running kubernetes instance")
+
+        for instance in instances:
+            try:
+                print("Login to ETCD instance and copy backup to local /tmp for Lambda")
+                download_file(instance['PublicIpAddress'], '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
+                print("Upload snapshot to S3")
+                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                return True
+            except BaseException as e:
+                print(str(e))
     except BaseException as e:
         print(str(e))
         print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
-        return False
 
-    try: 
-        print("Login to ETCD instance and copy backup to local /tmp for Lambda")
-        download_file(activeInstances[0]['PublicIpAddress'], '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
-        print("Upload snapshot to S3")
-        s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
-        return True
-    except BaseException as e:
-        print(str(e))
-        print("No go.  Good luck.  I hope you have other backups.")
-        return False
+        try:
+            print("Try to recover backup from S3")
+            s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+            return True
+        except BaseException as e:
+            print("No go.  Good luck.  I hope you have other backups.")
+            return False
     
 def uploadSnapshot(instances):
     for instance in instances:
@@ -258,8 +269,10 @@ def restoreSnapshot(rkeS3Bucket):
             print("Restore ETCD snapshot")
             cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', 'etcdsnapshot_restore', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
+            return True
         except BaseException as e:
             print(str(e))
+            return False
 
 def rkeUp():
     print("Start: RKE / Update Cluster")
@@ -268,33 +281,16 @@ def rkeUp():
     print("Finish: RKE / Update Cluster")
 
 def restartKubernetes(instances):
-    commands = {
+    commands = [
         'docker restart kube-apiserver kubelet kube-controller-manager kube-scheduler kube-proxy',
         'docker ps | grep flannel | cut -f 1 -d " " | xargs docker restart',
         'docker ps | grep calico | cut -f 1 -d " " | xargs docker restart'
-    }
+    ]
 
     for instance in instances:
         execute_cmd(instance['PublicIpAddress'], commands)
 
-def run(event, context):
-    print("Start App")
-    print(event)
-    print(context)
-    instanceUser=os.environ['InstanceUser']
-    FQDN=os.environ['FQDN']
-    rkeS3Bucket=os.environ['rkeS3Bucket']
-    asgName=os.environ['CLUSTER']
-    s3 = boto3.resource('s3')
-    pendingEc2s=0
-    responseData = {}
-
-    print("Init RKE")
-    _init_bin('rke')
-
-    #Download Instance RSA Key from S3 so RKE can access instances
-    instancePEM = downloadRSAKey(rkeS3Bucket)
-
+def checkEvent(event):
     #Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
@@ -317,6 +313,30 @@ def run(event, context):
             return True
     except BaseException as e:
         print(str(e))
+    return False
+
+def run(event, context):
+    print("Start App")
+    print(event)
+    print(context)
+    instanceUser=os.environ['InstanceUser']
+    FQDN=os.environ['FQDN']
+    rkeS3Bucket=os.environ['rkeS3Bucket']
+    asgName=os.environ['CLUSTER']
+    pendingEc2s=0
+    responseData = {}
+
+    print("Init RKE")
+    _init_bin('rke')
+
+    #Download Instance RSA Key from S3 so RKE can access instances
+    instancePEM = downloadRSAKey(rkeS3Bucket)
+
+    #Check event var for AWS lifecycle events from autoscaling group
+    eventStatus = checkEvent(event)
+    if eventStatus == True:
+        print("The app has completed running due to lifecycle event values")
+        return True
 
     #Ask AWS what instances are ready to go.  If any pending, we should come back and try again.
     setActiveInstances(asgName)
@@ -336,7 +356,7 @@ def run(event, context):
                 generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
                 print("Take snapshot from running healthy instaces and upload externally to S3")
-                snapshotStatus = takeSnapshot(rkeS3Bucket)
+                snapshotStatus = takeSnapshot(activeInstances, rkeS3Bucket)
 
                 print("Download RKE generated config")
                 s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
@@ -352,7 +372,13 @@ def run(event, context):
                 uploadSnapshotStatus = uploadSnapshot(activeInstances)
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
-                    restoreSnapshot(rkeS3Bucket)
+                    restoreStatus = restoreSnapshot(rkeS3Bucket)
+                    # print("Restart the Kubernetes components on all cluster nodes to prevent potential etcd conflicts")
+                    # restartKubernetes(activeInstances)
+                    if restoreStatus == False:
+                        print("Restore failed!")
+                        print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
+                        return False
 
             print("Install / Update Kubernetes cluster using RKE")
             rkeUp()
@@ -376,16 +402,18 @@ def run(event, context):
                     send(event, context, SUCCESS, responseData)
                 except BaseException as e:
                     print(str(e))
-                    return responseData
+                return responseData
         except BaseException as e:
             print(str(e))
             print("Something went wrong! Complete Lifecycle Event")
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
-            # time.sleep(15)
-            # try:
-            #     publishSNSMessage(snsMessage,snsTopicArn)
-            # except BaseException as e:
-            #     print(str(e))
+            print("Please download config.yaml from S3 bucket in your account and perform manual RKE steps to restore cluster.")
+            try:
+                #If Lambda executed from Lifecycle Event, issue success command
+                print("Complete Lifecycle Event")
+                response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            except BaseException as e:
+                print(str(e))
+            return False
     else:
         try:
             print("Our new instance is not ready!  Wait 15 seconds and try again.")
@@ -396,6 +424,7 @@ def run(event, context):
                 print(str(e))
         except BaseException as e:
             print(str(e))
+    return True
 
 def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     rkeConfig = ('ignore_docker_version: true\n'
