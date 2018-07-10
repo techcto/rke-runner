@@ -298,7 +298,7 @@ def checkEventStatus(event):
         lifecycleHookName=snsMessage['LifecycleHookName']
         lifecycleActionToken=snsMessage['LifecycleActionToken']
         lifecycleTransition=snsMessage['LifecycleTransition']
-        print("snsMessage" + snsMessage)
+        print(snsMessage)
 
         try:
             print("Ignore test event fire at beginning of cloudformation init")
@@ -308,7 +308,6 @@ def checkEventStatus(event):
                 return True
         except BaseException as e:
             print(str(e))
-            return True
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
             print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
