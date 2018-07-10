@@ -311,8 +311,15 @@ def checkEvent(event):
             print("Complete Lifecycle Event")
             response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
             return True
+
+        if lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
+            print("A new instance is being provisioned.  The best action is to do nothing and wait for the instance to come online.")
+            print("Complete Lifecycle Event")
+            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            return True
     except BaseException as e:
         print(str(e))
+
     return False
 
 def run(event, context):
@@ -334,7 +341,7 @@ def run(event, context):
 
     #Check event var for AWS lifecycle events from autoscaling group
     eventStatus = checkEvent(event)
-    if eventStatus == True:
+    if eventStatus:
         print("The app has completed running due to lifecycle event values")
         return True
 
