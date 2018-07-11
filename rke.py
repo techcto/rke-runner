@@ -290,7 +290,7 @@ def restartKubernetes(instances):
     for instance in instances:
         execute_cmd(instance['PublicIpAddress'], commands)
 
-def checkEventStatus(event,asgName):
+def checkEventStatus(event, asgName):
     print("Execute series of try/catches to deal with two different ways to call Lambda (SNS/Cloudformation/Manually)")
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
@@ -342,7 +342,7 @@ def run(event, context):
     instancePEM = downloadRSAKey(rkeS3Bucket)
 
     #Check event var for AWS lifecycle events from autoscaling group
-    eventStatus = checkEventStatus(event,asgName)
+    eventStatus = checkEventStatus(event, asgName)
     if eventStatus:
         print("The app has completed running due to lifecycle event values")
         return True
