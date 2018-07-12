@@ -107,7 +107,7 @@ def upload_file(host, downloadFrom, downloadTo):
     sftp = c.open_sftp()
 
     #Upload file to homr dir
-    downloadToTemp = "/home/rke-user/etcdsnapshot_restore"
+    downloadToTemp = "/home/rke-user/etcdsnapshot"
     print("Upload from " + downloadFrom + " to " + downloadToTemp)
     sftp.put(downloadFrom, downloadToTemp)
 
@@ -255,19 +255,28 @@ def takeSnapshot(instances, rkeS3Bucket):
     
 def uploadSnapshot(instances):
     for instance in instances:
+        print("Bug fix: mv /opt/rke/etcd-snapshots-restore /opt/rke/etcd-snapshots-restore-old")
+        try:
+            commands = [
+                'rm -Rf /opt/rke/etcd-snapshots-restore'
+            ]
+            execute_cmd(instance['PublicIpAddress'], commands)
+        except BaseException as e:
+            print(str(e))
+
         print("Upload etcdbackup to each instance")
         try:
-            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot_restore')
+            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
         except BaseException as e:
             print(str(e))
             return False
     return True
 
-def restoreSnapshot(rkeS3Bucket):
+def restoreSnapshot(instances, rkeS3Bucket):
     if os.path.isfile('/tmp/etcdsnapshot'):
         try:
             print("Restore ETCD snapshot")
-            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', 'etcdsnapshot_restore', '--config', '/tmp/config.yaml']
+            cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-restore', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
             subprocess.check_call(cmdline, shell=False, stderr=subprocess.STDOUT) 
             return True
         except BaseException as e:
@@ -315,9 +324,13 @@ def checkEventStatus(event, asgName):
             return True
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
-            print("A new instance is being provisioned.  The best action is to do nothing and wait for the instance to come online.")
+            print("A new instance is being provisioned.  The best action is to wait 30 seconds and try this again.")
             print("Complete Lifecycle Event")
-            response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
+            time.sleep(30)
+            try:
+                publishSNSMessage(snsMessage,snsTopicArn)
+            except BaseException as e:
+                print(str(e))            
             return True
     except BaseException as e:
         print(str(e))
@@ -381,7 +394,7 @@ def run(event, context):
                 uploadSnapshotStatus = uploadSnapshot(activeInstances)
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
-                    restoreStatus = restoreSnapshot(rkeS3Bucket)
+                    restoreStatus = restoreSnapshot(activeInstances, rkeS3Bucket)
                     if restoreStatus == False:
                         print("Restore failed!")
                         print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
@@ -457,7 +470,7 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
     'services:\n'
     '  etcd:\n'
     '    snapshot: true\n'
-    '    creation: 5m0s\n'
+    '    creation: 6h\n'
     '    retention: 24h\n'
     # '    path: /etcdcluster\n'
     # '    external_urls:\n'
