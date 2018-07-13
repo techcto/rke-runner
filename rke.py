@@ -216,16 +216,16 @@ def setActiveInstances(asgName):
                     print("We have a new instance.  Welcome!")
                     newInstances.append(instance)
 
-def downloadRSAKey(rkeS3Bucket):
+def downloadRSAKey(rancherBucket):
     #Download Instance RSA Key from S3 so RKE can do it's thing.
     print("Copy RSA from S3 to local")
-    s3.meta.client.download_file(rkeS3Bucket, 'rsa.pem', '/tmp/rsa.pem')
+    s3.meta.client.download_file(rancherBucket, 'rsa.pem', '/tmp/rsa.pem')
     with open("/tmp/rsa.pem", "rb") as rsa:
         instancePEM = rsa.read().decode("utf-8")
 
     return instancePEM
 
-def takeSnapshot(instances, rkeS3Bucket):
+def takeSnapshot(instances, rancherBucket):
     try:
         print("ETCD is attempting to be backed up")
         cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
@@ -237,7 +237,7 @@ def takeSnapshot(instances, rkeS3Bucket):
                 print("Login to ETCD instance and copy backup to local /tmp for Lambda")
                 download_file(instance['PublicIpAddress'], '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
                 print("Upload snapshot to S3")
-                s3.meta.client.upload_file('/tmp/etcdsnapshot', rkeS3Bucket, 'etcdsnapshot')
+                s3.meta.client.upload_file('/tmp/etcdsnapshot', rancherBucket, 'etcdsnapshot')
                 return True
             except BaseException as e:
                 print(str(e))
@@ -247,7 +247,7 @@ def takeSnapshot(instances, rkeS3Bucket):
 
         try:
             print("Try to recover backup from S3")
-            s3.meta.client.download_file(rkeS3Bucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
+            s3.meta.client.download_file(rancherBucket, 'etcdsnapshot', '/tmp/etcdsnapshot')
             return True
         except BaseException as e:
             print("No go.  Good luck.  I hope you have other backups.")
@@ -273,7 +273,7 @@ def uploadSnapshot(instances):
             return False
     return True
 
-def restoreSnapshot(instances, rkeS3Bucket):
+def restoreSnapshot(instances, rancherBucket):
     if os.path.isfile('/tmp/etcdsnapshot'):
         try:
             print("Restore ETCD snapshot")
@@ -344,7 +344,7 @@ def run(event, context):
     print(context)
     instanceUser=os.environ['InstanceUser']
     FQDN=os.environ['FQDN']
-    rkeS3Bucket=os.environ['rkeS3Bucket']
+    rancherBucket=os.environ['RancherBucket']
     asgName=os.environ['CLUSTER']
     pendingEc2s=0
     responseData = {}
@@ -353,7 +353,7 @@ def run(event, context):
     _init_bin('rke')
 
     #Download Instance RSA Key from S3 so RKE can access instances
-    instancePEM = downloadRSAKey(rkeS3Bucket)
+    instancePEM = downloadRSAKey(rancherBucket)
 
     #Check event var for AWS lifecycle events from autoscaling group
     eventStatus = checkEventStatus(event, asgName)
@@ -370,7 +370,7 @@ def run(event, context):
 
         try:
             try:
-                s3.Object(rkeS3Bucket, 'kube_config_config.yaml').load()
+                s3.Object(rancherBucket, 'kube_config_config.yaml').load()
             except BaseException as e:
                 print("This is a fresh install")
                 snapshotStatus = False
@@ -379,23 +379,23 @@ def run(event, context):
                 generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
                 print("Take snapshot from running healthy instaces and upload externally to S3")
-                snapshotStatus = takeSnapshot(activeInstances, rkeS3Bucket)
+                snapshotStatus = takeSnapshot(activeInstances, rancherBucket)
 
                 print("Download RKE generated config")
-                s3.meta.client.download_file(rkeS3Bucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
+                s3.meta.client.download_file(rancherBucket, 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
 
             print("Generate Kubernetes Cluster RKE config with all active instances")
             generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
             
             print("Upload latest config file to S3")
-            s3.meta.client.upload_file('/tmp/config.yaml', rkeS3Bucket, 'config.yaml')
+            s3.meta.client.upload_file('/tmp/config.yaml', rancherBucket, 'config.yaml')
 
             if snapshotStatus:
                 print("Upload latest snapshot to all instances")
                 uploadSnapshotStatus = uploadSnapshot(activeInstances)
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
-                    restoreStatus = restoreSnapshot(activeInstances, rkeS3Bucket)
+                    restoreStatus = restoreSnapshot(activeInstances, rancherBucket)
                     if restoreStatus == False:
                         print("Restore failed!")
                         print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
@@ -407,7 +407,7 @@ def run(event, context):
             rkeUp()
 
             print("Upload RKE generated config")
-            s3.meta.client.upload_file('/tmp/kube_config_config.yaml', rkeS3Bucket, 'kube_config_config.yaml')
+            s3.meta.client.upload_file('/tmp/kube_config_config.yaml', rancherBucket, 'kube_config_config.yaml')
 
             print("Restart the Kubernetes components on all cluster nodes to prevent potential etcd conflicts")
             restartKubernetes(activeInstances)
@@ -605,12 +605,12 @@ def generateRKEConfig(asgInstances, instanceUser, instancePEM, FQDN, rkeCrts):
 def generateCertificates(FQDN):
     #Create CA Signing Authority
     os.environ['HOME'] = '/tmp'
-    rkeS3Bucket=os.environ['rkeS3Bucket']
+    rancherBucket=os.environ['RancherBucket']
     openssl("version")
     s3 = boto3.resource('s3')
 
     try:
-        s3.Object(rkeS3Bucket, 'server.crt').load()
+        s3.Object(rancherBucket, 'server.crt').load()
     except BaseException as e:
         print("Generate a new set of ssl certificates")
 
@@ -626,17 +626,17 @@ def generateCertificates(FQDN):
         #Upload certs to s3
         try:
             print("Upload certs to S3")
-            s3.meta.client.upload_file('/tmp/server.crt', rkeS3Bucket, 'server.crt')
-            s3.meta.client.upload_file('/tmp/server.key', rkeS3Bucket, 'server.key')
-            s3.meta.client.upload_file('/tmp/ca.crt', rkeS3Bucket, 'ca.crt')
+            s3.meta.client.upload_file('/tmp/server.crt', rancherBucket, 'server.crt')
+            s3.meta.client.upload_file('/tmp/server.key', rancherBucket, 'server.key')
+            s3.meta.client.upload_file('/tmp/ca.crt', rancherBucket, 'ca.crt')
         except BaseException as e:
             print(str(e))
             return False
     else:
         print("Download previously generated ssl certificates from S3")
-        s3.meta.client.download_file(rkeS3Bucket, 'server.crt', '/tmp/server.crt')
-        s3.meta.client.download_file(rkeS3Bucket, 'server.key', '/tmp/server.key')
-        s3.meta.client.download_file(rkeS3Bucket, 'ca.crt', '/tmp/ca.crt')
+        s3.meta.client.download_file(rancherBucket, 'server.crt', '/tmp/server.crt')
+        s3.meta.client.download_file(rancherBucket, 'server.key', '/tmp/server.key')
+        s3.meta.client.download_file(rancherBucket, 'ca.crt', '/tmp/ca.crt')
 
     rkeCrts={}
 
