@@ -10,8 +10,8 @@ phases:
       - pip install paramiko -t .
   post_build:
     commands:
-      - zip -r S3initRKE.zip .
+      - zip -r rke-runer.zip .
       - echo Build completed on `date`
 artifacts:
   files:
-    - 'S3initRKE.zip'
+    - 'rke-runer.zip'

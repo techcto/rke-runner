@@ -255,10 +255,11 @@ def takeSnapshot(instances, rkeS3Bucket):
     
 def uploadSnapshot(instances):
     for instance in instances:
-        print("Bug fix: mv /opt/rke/etcd-snapshots-restore /opt/rke/etcd-snapshots-restore-old")
+        print("Bug fix: etcd-restore not happy")
         try:
             commands = [
-                'rm -Rf /opt/rke/etcd-snapshots-restore'
+                'rm -Rf /opt/rke/etcd-snapshots-restore',
+                'docker rm etcd-restore'
             ]
             execute_cmd(instance['PublicIpAddress'], commands)
         except BaseException as e:
