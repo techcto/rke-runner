@@ -348,7 +348,7 @@ def run(event, context):
     asgName=os.environ['CLUSTER']
     pendingEc2s=0
     responseData = {}
-
+ 
     print("Init RKE")
     _init_bin('rke')
 
