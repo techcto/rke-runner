@@ -94,27 +94,28 @@ def download_file(host, downloadFrom, downloadTo):
         'message' : "Script execution completed. See Cloudwatch logs for complete output"
     }
 
-def upload_file(host, downloadFrom, downloadTo):
+def upload_file(host, instanceUser, downloadFrom, downloadTo):
     k = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     print("Connecting to " + host)
-    c.connect( hostname = host, username = "rke-user", pkey = k )
+    c.connect( hostname = host, username = instanceUser, pkey = k )
     print("Connected to " + host)
 
     #Open connection
     sftp = c.open_sftp()
 
     #Upload file to homr dir
-    downloadToTemp = "/home/rke-user/etcdsnapshot"
-    print("Upload from " + downloadFrom + " to " + downloadToTemp)
-    sftp.put(downloadFrom, downloadToTemp)
+    tmpFilename = time.strftime("%Y%m%d-%H%M%S")
+    downloadToTmp = "/home/" + instanceUser + "/" + tmpFilename
+    print("Upload from " + downloadFrom + " to " + downloadToTmp)
+    sftp.put(downloadFrom, downloadToTmp)
 
     #Clean out old file and replace with new file
     commands = [
         'rm -f  ' + downloadTo,
-        'mv ' + downloadToTemp + ' ' + downloadTo,
+        'mv ' + downloadToTmp + ' ' + downloadTo,
         'ls -al ' + downloadTo
     ]
     execute_cmd(host, commands)
