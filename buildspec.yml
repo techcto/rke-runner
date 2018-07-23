@@ -10,8 +10,8 @@ phases:
       - pip install paramiko -t .
   post_build:
     commands:
-      - zip -r rke-runer.zip .
+      - zip -r rke-runner.zip .
       - echo Build completed on `date`
 artifacts:
   files:
-    - 'rke-runer.zip'
+    - 'rke-runner.zip'
