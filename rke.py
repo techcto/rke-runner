@@ -346,7 +346,7 @@ def run(event, context):
     instanceUser=os.environ['InstanceUser']
     FQDN=os.environ['FQDN']
     rancherBucket=os.environ['RancherBucket']
-    asgName=os.environ['CLUSTER']
+    asgName=os.environ['Cluster']
     pendingEc2s=0
     responseData = {}
  
