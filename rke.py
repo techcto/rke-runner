@@ -306,18 +306,20 @@ def checkEventStatus(event, asgName):
     try:
         snsTopicArn=event['Records'][0]['Sns']['TopicArn']
         snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
-        lifecycleHookName=snsMessage['LifecycleHookName']
-        lifecycleActionToken=snsMessage['LifecycleActionToken']
-        lifecycleTransition=snsMessage['LifecycleTransition']
 
         try:
-            print("Ignore test event fire at beginning of cloudformation init")
             if snsMessage['Event'] == "autoscaling:TEST_NOTIFICATION":
+                print("Ignore test event fire at beginning of cloudformation init")
                 print("Complete Lifecycle Event")
                 response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
                 return True
         except BaseException as e:
             print(str(e))
+
+        print("Check for Lifecycle vars")
+        lifecycleHookName=snsMessage['LifecycleHookName']
+        lifecycleActionToken=snsMessage['LifecycleActionToken']
+        lifecycleTransition=snsMessage['LifecycleTransition']
 
         if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
             print("We are losing instances or something worse.  The best action is to do nothing and hope the new servers can heal the cluster.")
@@ -335,6 +337,7 @@ def checkEventStatus(event, asgName):
                 print(str(e))            
             return True
     except BaseException as e:
+        print("Error: Houston, we have a problem!")
         print(str(e))
 
     return False
@@ -437,7 +440,10 @@ def run(event, context):
                 response = autoscalingClient.complete_lifecycle_action(LifecycleHookName=lifecycleHookName,AutoScalingGroupName=asgName,LifecycleActionToken=lifecycleActionToken,LifecycleActionResult='CONTINUE')
             except BaseException as e:
                 print(str(e))
-            return False
+
+            # Go back to false once working.  Nice to have true to test 
+            # return False
+            return True
     else:
         try:
             print("Our new instance is not ready!  Wait 15 seconds and try again.")
