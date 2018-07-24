@@ -254,7 +254,7 @@ def takeSnapshot(instances, rancherBucket):
             print("No go.  Good luck.  I hope you have other backups.")
             return False
     
-def uploadSnapshot(instances):
+def uploadSnapshot(instances, instanceUser):
     for instance in instances:
         print("Bug fix: etcd-restore not happy")
         try:
@@ -268,7 +268,7 @@ def uploadSnapshot(instances):
 
         print("Upload etcdbackup to each instance")
         try:
-            upload_file(instance['PublicIpAddress'], '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
+            upload_file(instance['PublicIpAddress'], instanceUser, '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
         except BaseException as e:
             print(str(e))
             return False
@@ -378,7 +378,9 @@ def run(event, context):
             except BaseException as e:
                 print("This is a fresh install")
                 snapshotStatus = False
+                clusterStatus = Install
             else:
+                clusterStatus = Update
                 print("Generate RKE ETCD backup config")
                 generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
@@ -396,7 +398,7 @@ def run(event, context):
 
             if snapshotStatus:
                 print("Upload latest snapshot to all instances")
-                uploadSnapshotStatus = uploadSnapshot(activeInstances)
+                uploadSnapshotStatus = uploadSnapshot(activeInstances, instanceUser)
                 if uploadSnapshotStatus:
                     print("Restore instances with latest snapshot")
                     restoreStatus = restoreSnapshot(activeInstances, rancherBucket)
@@ -407,7 +409,7 @@ def run(event, context):
                         restartKubernetes(activeInstances)
                         return False
 
-            print("Install / Update Kubernetes cluster using RKE")
+            print(clusterStatus + " Kubernetes cluster using RKE")
             rkeUp()
 
             print("Upload RKE generated config")
