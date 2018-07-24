@@ -337,7 +337,7 @@ def checkEventStatus(event, asgName):
                 print(str(e))            
             return True
     except BaseException as e:
-        print("Error: Houston, we have a problem!")
+        print("Error: Most likely you are calling this Lambda manually.")
         print(str(e))
 
     return False
