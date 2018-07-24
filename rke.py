@@ -378,9 +378,9 @@ def run(event, context):
             except BaseException as e:
                 print("This is a fresh install")
                 snapshotStatus = False
-                clusterStatus = Install
+                clusterStatus = "Install"
             else:
-                clusterStatus = Update
+                clusterStatus = "Update"
                 print("Generate RKE ETCD backup config")
                 generateRKEConfig(activeInstances,instanceUser,instancePEM,FQDN,rkeCrts)
 
