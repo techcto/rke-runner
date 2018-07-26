@@ -82,7 +82,6 @@ def update(env, asg):
     rke.rkeUp()
     print("Upload RKE generated config")
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
-    rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
     exit(env, asg)
     
 def backup(env, asg):
