@@ -33,8 +33,15 @@ def run(event, context):
     awsasg.check_instance_status()
 
     #Check RKE Status
-    rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
+    rkeStatus = init()
 
+    #Run Application
+    dispatcher(os.environ, awsasg, rkeStatus);
+
+    return True
+
+def init():
+    rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
     if rkeStatus == True:
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
     else:
@@ -44,24 +51,15 @@ def run(event, context):
         rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
         print("Upload generated config file to S3 for backup")
         s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
-
-    #Run Application
-    dispatcher(os.environ, awsasg, rkeStatus);
-
-    return True
+    return rkeStatus
 
 def dispatcher(env, asg, rkeStatus):
     if os.environ['Status'] == "clean":
         rke.rkeDown(asg.activeInstances, env['InstanceUser'])
-    elif rkeStatus == True:
+    elif (rkeStatus == True) or (asg.snsSubject == "update"):
+        uploadRestoreSnapshot(env, asg)
+    elif asg.status == "backup":
         backup(env, asg)
-    elif asg.snsSubject == "uploadSnapshot":
-        uploadSnapshot(env, asg)
-    elif asg.snsSubject == "update":
-        restore(env, asg)
-    elif asg.status == "backupexit":
-        backup(env, asg)
-        exit(env, asg)
     elif asg.status == "exit":
         exit(env, asg)
     elif asg.status == "retry":
@@ -71,8 +69,6 @@ def dispatcher(env, asg, rkeStatus):
     return True
 
 def install(env, asg):
-    print("Upload generated config file to S3 for backup")
-    s3Client.upload_file('/tmp/config.yaml', env['Bucket'], 'config.yaml')
     print("Install Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated config")
@@ -93,13 +89,15 @@ def update(env, asg):
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
-    status = awslambda.publish_sns_message("uploadSnapshot")
-    if status == False:
-        uploadSnapshot(env, asg)
+    exit(env, asg)
 
-def uploadSnapshot(env, asg):
+def uploadRestoreSnapshot(env, asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
+    print("Call Update Function via SNS")
+    status = awslambda.publish_sns_message("restore")
+    if status == False:
+        restore(env, asg)
     
 def restore(env, asg):
     print("Restore instances with latest snapshot")
