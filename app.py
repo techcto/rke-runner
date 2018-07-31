@@ -123,8 +123,8 @@ def exit(env, asg):
     return True
 
 def retry(env, asg):
-    time.sleep(15)
-    status = awslambda.publish_sns_message()
+    time.sleep(60)
+    status = awslambda.publish_sns_message('')
     if status == False:
         install(env, asg)
     return True
