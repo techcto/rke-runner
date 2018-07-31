@@ -9,7 +9,7 @@ class RkeEtcd:
         self.lambdautils = lambdautils.LambdaUtils()
         self.s3Client = boto3.client('s3')
 
-    def takeSnapshot(self, instances, bucket):
+    def takeSnapshot(self, instances, username, bucket):
         try:
             print("ETCD is attempting to be backed up")
             cmdline = [os.path.join(BIN_DIR, 'rke'), 'etcd', 'snapshot-save', '--name', 'etcdsnapshot', '--config', '/tmp/config.yaml']
@@ -19,12 +19,13 @@ class RkeEtcd:
             for instance in instances:
                 try:
                     print("Login to ETCD instance and copy backup to local /tmp for Lambda")
-                    self.s3Client.download_file(instance['PublicIpAddress'], '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
+                    self.lambdautils.download_file(instance['PublicIpAddress'], username, '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
                     print("Upload snapshot to S3")
                     self.s3Client.upload_file('/tmp/etcdsnapshot', bucket, 'etcdsnapshot')
-                    return True
+                    break
                 except BaseException as e:
                     print(str(e))
+            return True
         except BaseException as e:
             print(str(e))
             print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
@@ -39,15 +40,15 @@ class RkeEtcd:
 
     def uploadSnapshot(self, instances, username):
         for instance in instances:
-            print("Bug fix: etcd-restore not happy")
-            try:
-                commands = [
-                    'rm -Rf /opt/rke/etcd-snapshots-restore',
-                    'docker rm etcd-restore'
-                ]
-                self.lambdautils.execute_cmd(instance['PublicIpAddress'], username, commands)
-            except BaseException as e:
-                print(str(e))
+            # print("Bug fix: etcd-restore not happy")
+            # try:
+            #     commands = [
+            #         'rm -Rf /opt/rke/etcd-snapshots-restore',
+            #         'docker rm etcd-restore'
+            #     ]
+            #     self.lambdautils.execute_cmd(instance['PublicIpAddress'], username, commands)
+            # except BaseException as e:
+            #     print(str(e))
 
             print("Upload etcdbackup to each instance")
             try:

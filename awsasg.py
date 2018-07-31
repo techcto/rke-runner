@@ -10,12 +10,18 @@ class AwsAsg:
         self.snsTopicArn = ""
         self.snsSubject = ""
         self.snsMessage = ""
+        self.lifecycleHookName = ""
+        self.lifecycleActionToken = ""
         self.autoscalingClient = boto3.client('autoscaling')
         self.ec2Client = boto3.client('ec2')
 
     def complete_lifecycle_action(self, lifecycleActionResult):
-        response = self.autoscalingClient.complete_lifecycle_action(LifecycleHookName=self.lifecycleHookName,AutoScalingGroupName=self.cluster,LifecycleActionToken=self.lifecycleActionToken,LifecycleActionResult=lifecycleActionResult)
-        return response
+        try:
+            response = self.autoscalingClient.complete_lifecycle_action(LifecycleHookName=self.lifecycleHookName,AutoScalingGroupName=self.cluster,LifecycleActionToken=self.lifecycleActionToken,LifecycleActionResult=lifecycleActionResult)
+            if response:
+                return response
+        except BaseException as e:
+            print(str(e))
 
     def check_instance_status(self):
         #Get all instances for an ASG

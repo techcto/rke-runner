@@ -12,12 +12,22 @@ class Rke:
         self.s3Client = boto3.client('s3')
         self.s3 = boto3.resource('s3')
 
-    def rkeDown(self):
+    def rkeDown(self, instances, username):
         print("RKE Wipe Cluster")
         cmdline = [os.path.join(BIN_DIR, 'rke'), 'remove', '--config', '/tmp/config.yaml']
         rke_proc = Popen(cmdline, shell=False, stdin=PIPE, stderr=subprocess.STDOUT)
         rke_proc.communicate(b'Y\n')
         print("Finish Wiping and Install New Cluster")
+
+        commands = [
+            'docker rm -f $(docker ps -qa)',
+            'docker volume rm $(docker volume ls -q)',
+            'cleanupdirs="/var/lib/etcd /etc/kubernetes /etc/cni /opt/cni /var/lib/cni /var/run/calico /opt/rke"',
+            'for dir in $cleanupdirs; do echo "Removing $dir"; rm -rf $dir; done'
+        ]
+        for instance in instances:
+            self.lambdautils.execute_cmd(instance['PublicIpAddress'], username, commands)
+        print("Finish Running Cleanup Script")
 
     def rkeUp(self):
         print("Start: RKE / Update Cluster")

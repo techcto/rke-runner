@@ -11,6 +11,8 @@ class LambdaUtils:
     def __init__(self):
         print("Init LambdaUtils Class")
         self.s3Client = boto3.resource('s3')
+        self.c = paramiko.SSHClient()
+        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.key = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
 
     def _init_bin(self, executable_name):
@@ -44,14 +46,11 @@ class LambdaUtils:
         subprocess.check_call(cmdline)
 
     def download_file(self, host, username, downloadFrom, downloadTo):
-        c = paramiko.SSHClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
         print("Connecting to " + host)
-        c.connect( hostname = host, username = username, pkey = self.key )
+        self.c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
 
-        sftp = c.open_sftp()
+        sftp = self.c.open_sftp()
         sftp.get(downloadFrom, downloadTo)
 
         return
@@ -60,15 +59,12 @@ class LambdaUtils:
         }
 
     def upload_file(self, host, username, downloadFrom, downloadTo):
-        c = paramiko.SSHClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
         print("Connecting to " + host)
-        c.connect( hostname = host, username = username, pkey = self.key )
+        self.c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
 
         #Open connection
-        sftp = c.open_sftp()
+        sftp = self.c.open_sftp()
 
         #Upload file to homr dir
         tmpFilename = time.strftime("%Y%m%d-%H%M%S")
@@ -90,16 +86,13 @@ class LambdaUtils:
         }
 
     def execute_cmd(self, host, username, commands):
-        c = paramiko.SSHClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
         print("Connecting to " + host)
-        c.connect( hostname = host, username = username, pkey = self.key )
+        self.c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
 
         for command in commands:
             print("Executing {}".format(command))
-            stdin, stdout, stderr = c.exec_command(command)
+            stdin, stdout, stderr = self.c.exec_command(command)
             output = stdout.read()
             if output:
                 print(output.decode("utf-8"))

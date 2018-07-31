@@ -42,8 +42,7 @@ def run(event, context):
 
 def dispatcher(env, asg, rkeStatus):
     if os.environ['Clean'] == "True":
-        rke.rkeDown()
-        # install(env, asg)
+        rke.rkeDown(asg.activeInstances, env['InstanceUser'])
     elif rkeStatus == True:
         backup(env, asg)
     elif asg.snsSubject == "restore":
@@ -90,7 +89,7 @@ def update(env, asg):
     
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
-    rkeetcd.takeSnapshot(asg.activeInstances, env['Bucket'])
+    rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
     status = awslambda.publish_sns_message("restore")
     if status == False:
         restore(env, asg)
@@ -101,13 +100,14 @@ def restore(env, asg):
     if uploadSnapshotStatus:
         print("Restore instances with latest snapshot")
         restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
-        rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
         if restoreStatus == False:
             print("Restore failed!")
             print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
             print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
             exit(env, asg)
         else:
+            print("Restart Kubernetes")
+            rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
             print("Call Update Function via SNS")
             status = awslambda.publish_sns_message("update")
             if status == False:
