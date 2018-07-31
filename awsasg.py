@@ -87,9 +87,9 @@ class AwsAsg:
                     self.lifecycleActionToken=snsMessage['LifecycleActionToken']
                     self.lifecycleTransition=snsMessage['LifecycleTransition']
 
-                    if lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
-                        runStatus = "exit"
-                    elif lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
+                    if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
+                        runStatus = "backupexit"
+                    elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
                         runStatus = "retry"
                     else:
                         runStatus = "run"
