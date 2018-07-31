@@ -89,6 +89,7 @@ def update(env, asg):
     
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
+    s3Client.download_file(env['Bucket'], 'config.yaml', '/tmp/config.yaml')
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
     status = awslambda.publish_sns_message("restore")
     if status == False:
@@ -99,6 +100,7 @@ def restore(env, asg):
     uploadSnapshotStatus = rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
     if uploadSnapshotStatus:
         print("Restore instances with latest snapshot")
+        s3Client.download_file(env['Bucket'], 'config.yaml', '/tmp/config.yaml')
         restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
         if restoreStatus == False:
             print("Restore failed!")
