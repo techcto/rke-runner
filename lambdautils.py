@@ -13,6 +13,11 @@ class LambdaUtils:
         self.s3Client = boto3.resource('s3')
         self.c = paramiko.SSHClient()
         self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        print("Downloading RSA key from " + os.environ['Bucket'])
+        self.s3Client.meta.client.download_file(os.environ['Bucket'], 'rsa.pem', '/tmp/rsa.pem')
+        with open("/tmp/rsa.pem", "rb") as rsa:
+            os.environ['instancePEM'] = rsa.read().decode("utf-8")
         self.key = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
 
     def _init_bin(self, executable_name):

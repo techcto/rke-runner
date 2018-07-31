@@ -12,11 +12,6 @@ class AwsLambda:
         self.snsClient = boto3.client('sns')
         self.s3Client = boto3.resource('s3')
 
-        print("Downloading RSA key from " + os.environ['Bucket'])
-        self.s3Client.meta.client.download_file(os.environ['Bucket'], 'rsa.pem', '/tmp/rsa.pem')
-        with open("/tmp/rsa.pem", "rb") as rsa:
-            os.environ['instancePEM'] = rsa.read().decode("utf-8")
-
     def publish_sns_message(self, subject):
         try:
             response = self.snsClient.publish(TopicArn=self.asg.snsTopicArn,Message=json.dumps(self.asg.snsMessage),Subject=subject)
