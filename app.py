@@ -35,6 +35,16 @@ def run(event, context):
     #Check RKE Status
     rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
 
+    if rkeStatus == True:
+        s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
+    else:
+        print("Generate certificates")
+        rkeCrts = rke.generateCertificates()
+        print("Generate Kubernetes Cluster RKE config with all active instances")
+        rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
+        print("Upload generated config file to S3 for backup")
+        s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
+
     #Run Application
     dispatcher(os.environ, awsasg, rkeStatus);
 
@@ -58,10 +68,6 @@ def dispatcher(env, asg, rkeStatus):
     return True
 
 def install(env, asg):
-    print("Generate certificates")
-    rkeCrts = rke.generateCertificates()
-    print("Generate Kubernetes Cluster RKE config with all active instances")
-    rke.generateRKEConfig(asg.activeInstances,env['InstanceUser'],os.environ['instancePEM'],env['FQDN'],rkeCrts)
     print("Upload generated config file to S3 for backup")
     s3Client.upload_file('/tmp/config.yaml', env['Bucket'], 'config.yaml')
     print("Install Kubernetes via RKE")
@@ -73,14 +79,8 @@ def install(env, asg):
     exit(env, asg)
     
 def update(env, asg):
-    print("Get certificates")
-    rkeCrts = rke.getCertificates()
     print("Download RKE generated config")
     s3Client.download_file(env['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
-    print("Generate Kubernetes Cluster RKE config with all active instances")
-    rke.generateRKEConfig(asg.activeInstances,env['InstanceUser'],os.environ['instancePEM'],env['FQDN'],rkeCrts)
-    print("Upload generated config file to S3 for backup")
-    s3Client.upload_file('/tmp/config.yaml', env['Bucket'], 'config.yaml')
     print("Update Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated config")
@@ -89,7 +89,6 @@ def update(env, asg):
     
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
-    s3Client.download_file(env['Bucket'], 'config.yaml', '/tmp/config.yaml')
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
     status = awslambda.publish_sns_message("restore")
     if status == False:
@@ -100,7 +99,6 @@ def restore(env, asg):
     uploadSnapshotStatus = rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
     if uploadSnapshotStatus:
         print("Restore instances with latest snapshot")
-        s3Client.download_file(env['Bucket'], 'config.yaml', '/tmp/config.yaml')
         restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
         if restoreStatus == False:
             print("Restore failed!")

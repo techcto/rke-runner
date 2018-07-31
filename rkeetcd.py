@@ -1,5 +1,9 @@
 import boto3,os,subprocess,base64
 import lambdautils
+import rke
+
+rke = rke.Rke()
+s3Client = boto3.client('s3')
 
 BIN_DIR = '/tmp/bin'
 
