@@ -51,10 +51,12 @@ def run(event, context):
     return True
 
 def dispatcher(env, asg, rkeStatus):
-    if os.environ['Clean'] == "True":
+    if os.environ['Status'] == "clean":
         rke.rkeDown(asg.activeInstances, env['InstanceUser'])
     elif rkeStatus == True:
         backup(env, asg)
+    elif asg.snsSubject == "uploadSnapshot":
+        uploadSnapshot(env, asg)
     elif asg.snsSubject == "restore":
         restore(env, asg)
     elif asg.snsSubject == "update":
@@ -90,28 +92,34 @@ def update(env, asg):
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
-    status = awslambda.publish_sns_message("restore")
+    status = awslambda.publish_sns_message("uploadSnapshot")
     if status == False:
-        restore(env, asg)
-    
-def restore(env, asg):
+        uploadSnapshot(env, asg)
+
+def uploadSnapshot(env, asg):
     print("Upload latest snapshot to all instances")
     uploadSnapshotStatus = rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
     if uploadSnapshotStatus:
-        print("Restore instances with latest snapshot")
-        restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
-        if restoreStatus == False:
-            print("Restore failed!")
-            print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
-            print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
-            exit(env, asg)
-        else:
-            print("Restart Kubernetes")
-            rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
-            print("Call Update Function via SNS")
-            status = awslambda.publish_sns_message("update")
-            if status == False:
-                update(env, asg)
+        print("Call Update Function via SNS")
+        status = awslambda.publish_sns_message("restore")
+        if status == False:
+            restore(env, asg)
+    
+def restore(env, asg):
+    print("Restore instances with latest snapshot")
+    restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
+    if restoreStatus == False:
+        print("Restore failed!")
+        print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
+        print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
+        exit(env, asg)
+    else:
+        print("Restart Kubernetes")
+        rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
+        print("Call Update Function via SNS")
+        status = awslambda.publish_sns_message("update")
+        if status == False:
+            update(env, asg)
 
 def exit(env, asg):
     print("Complete Lifecycle")
