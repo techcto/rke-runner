@@ -22,6 +22,7 @@ def run(event, context):
     print("Run App")
     print(event)
     print(context)
+    print(os.environ)
 
     lambdautils._init_bin('rke')
 
@@ -40,7 +41,10 @@ def run(event, context):
     return True
 
 def dispatcher(env, asg, rkeStatus):
-    if rkeStatus == True:
+    if os.environ['Clean'] == "True":
+        rke.rkeDown()
+        # install(env, asg)
+    elif rkeStatus == True:
         backup(env, asg)
     elif asg.snsSubject == "restore":
         restore(env, asg)

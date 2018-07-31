@@ -1,6 +1,8 @@
 import boto3,os,subprocess,base64
 import lambdautils
 
+from subprocess import Popen,PIPE
+
 BIN_DIR = '/tmp/bin'
 
 class Rke:
@@ -10,6 +12,13 @@ class Rke:
         self.s3Client = boto3.client('s3')
         self.s3 = boto3.resource('s3')
 
+    def rkeDown(self):
+        print("RKE Wipe Cluster")
+        cmdline = [os.path.join(BIN_DIR, 'rke'), 'remove', '--config', '/tmp/config.yaml']
+        rke_proc = Popen(cmdline, shell=False, stdin=PIPE, stderr=subprocess.STDOUT)
+        rke_proc.communicate(b'Y\n')
+        print("Finish Wiping and Install New Cluster")
+
     def rkeUp(self):
         print("Start: RKE / Update Cluster")
         cmdline = [os.path.join(BIN_DIR, 'rke'), 'up', '--config', '/tmp/config.yaml']
@@ -18,6 +27,7 @@ class Rke:
 
     def restartKubernetes(self, instances, username):
         commands = [
+            'docker stop etcd-rolling-snapshots',
             'docker restart kube-apiserver kubelet kube-controller-manager kube-scheduler kube-proxy',
             'docker ps | grep flannel | cut -f 1 -d " " | xargs docker restart',
             'docker ps | grep calico | cut -f 1 -d " " | xargs docker restart'

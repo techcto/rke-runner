@@ -15,6 +15,7 @@ class AwsAsg:
 
     def complete_lifecycle_action(self, lifecycleActionResult):
         response = self.autoscalingClient.complete_lifecycle_action(LifecycleHookName=self.lifecycleHookName,AutoScalingGroupName=self.cluster,LifecycleActionToken=self.lifecycleActionToken,LifecycleActionResult=lifecycleActionResult)
+        return response
 
     def check_instance_status(self):
         #Get all instances for an ASG
