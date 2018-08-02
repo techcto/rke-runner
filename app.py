@@ -49,8 +49,6 @@ def init():
         rkeCrts = rke.generateCertificates()
         print("Generate Kubernetes Cluster RKE config with all active instances")
         rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
-        print("Upload generated config file to S3 for backup")
-        s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     return rkeStatus
 
 def dispatcher(env, asg, rkeStatus):
@@ -73,7 +71,8 @@ def dispatcher(env, asg, rkeStatus):
 def install(env, asg):
     print("Install Kubernetes via RKE")
     rke.rkeUp()
-    print("Upload RKE generated config")
+    print("Upload RKE generated configs")
+    s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
     print("Complete Lifecycle")
     asg.complete_lifecycle_action('CONTINUE')
@@ -84,7 +83,8 @@ def update(env, asg):
     s3Client.download_file(env['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
     print("Update Kubernetes via RKE")
     rke.rkeUp()
-    print("Upload RKE generated config")
+    print("Upload RKE generated configs")
+    s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
     exit(env, asg)
     
