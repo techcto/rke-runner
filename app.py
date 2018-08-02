@@ -57,6 +57,8 @@ def dispatcher(env, asg, rkeStatus):
     if os.environ['Status'] == "clean":
         rke.rkeDown(asg.activeInstances, env['InstanceUser'])
     elif (rkeStatus == True) or (asg.snsSubject == "update"):
+        if os.path.isfile('/tmp/etcdsnapshot'):
+            backup(env, asg)
         uploadRestoreSnapshot(env, asg)
     elif asg.status == "backup":
         backup(env, asg)

@@ -11,13 +11,11 @@ class LambdaUtils:
     def __init__(self):
         print("Init LambdaUtils Class")
         self.s3Client = boto3.resource('s3')
-        self.c = paramiko.SSHClient()
-        self.c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
         print("Downloading RSA key from " + os.environ['Bucket'])
         self.s3Client.meta.client.download_file(os.environ['Bucket'], 'rsa.pem', '/tmp/rsa.pem')
         with open("/tmp/rsa.pem", "rb") as rsa:
             os.environ['instancePEM'] = rsa.read().decode("utf-8")
+
         self.key = paramiko.RSAKey.from_private_key_file("/tmp/rsa.pem")
 
     def _init_bin(self, executable_name):
@@ -51,12 +49,14 @@ class LambdaUtils:
         subprocess.check_call(cmdline)
 
     def download_file(self, host, username, downloadFrom, downloadTo):
+        c = paramiko.SFTPClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
         print("Connecting to " + host)
-        self.c.connect( hostname = host, username = username, pkey = self.key )
+        c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
 
-        sftp = self.c.open_sftp()
-        sftp.get(downloadFrom, downloadTo)
+        c.get(downloadFrom, downloadTo)
 
         return
         {
@@ -64,18 +64,18 @@ class LambdaUtils:
         }
 
     def upload_file(self, host, username, downloadFrom, downloadTo):
-        print("Connecting to " + host)
-        self.c.connect( hostname = host, username = username, pkey = self.key )
-        print("Connected to " + host)
+        c = paramiko.SFTPClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        #Open connection
-        sftp = self.c.open_sftp()
+        print("Connecting to " + host)
+        c.connect( hostname = host, username = username, pkey = self.key )
+        print("Connected to " + host)
 
         #Upload file to homr dir
         tmpFilename = time.strftime("%Y%m%d-%H%M%S")
         downloadToTmp = "/home/" + username + "/" + tmpFilename
         print("Upload from " + downloadFrom + " to " + downloadToTmp)
-        sftp.put(downloadFrom, downloadToTmp)
+        c.put(downloadFrom, downloadToTmp)
 
         #Clean out old file and replace with new file
         commands = [
@@ -91,13 +91,16 @@ class LambdaUtils:
         }
 
     def execute_cmd(self, host, username, commands):
+        c = paramiko.SSHClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
         print("Connecting to " + host)
-        self.c.connect( hostname = host, username = username, pkey = self.key )
+        c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
 
         for command in commands:
             print("Executing {}".format(command))
-            stdin, stdout, stderr = self.c.exec_command(command)
+            stdin, stdout, stderr = c.exec_command(command)
             output = stdout.read()
             if output:
                 print(output.decode("utf-8"))
