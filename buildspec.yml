@@ -4,9 +4,9 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Compiling the Python code...
-      - apt-get -y install zip curl
       - curl -qL -o jq https://stedolan.github.io/jq/download/linux64/jq && chmod +x ./jq
+      - curl -O https://bootstrap.pypa.io/get-pip.py
+      - python get-pip.py
       - pip install awscli
       - aws --version
       - curl -qL -o aws_credentials.json http://169.254.170.2/$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI > aws_credentials.json
@@ -15,8 +15,6 @@ phases:
       - aws configure set aws_secret_access_key `./jq -r '.SecretAccessKey' aws_credentials.json`
       - aws configure set aws_session_token `./jq -r '.Token' aws_credentials.json`
       - pip install paramiko -t .
-  post_build:
-    commands:
       - zip -r rke-runner.zip .
       - aws s3 cp rke-runner.zip s3://rancher-aws/rke/rke-runner.zip --force
       - echo Build completed on `date`
