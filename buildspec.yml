@@ -4,6 +4,7 @@ phases:
   build:
     commands:
       - echo Build started on `date`
+      - yum install -y zip
       - curl -qL -o jq https://stedolan.github.io/jq/download/linux64/jq && chmod +x ./jq
       - curl -O https://bootstrap.pypa.io/get-pip.py
       - python get-pip.py
