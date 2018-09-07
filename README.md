@@ -11,10 +11,13 @@ To use RKE runner:
     - InstanceUser: This is the user RKE runner will generate for you to manage the AWS instances
     - Bucket: This is the S3 bucket where RKE runner will use to store important information needed to manage your Kubernetes cluster
     - Status: Leave this blank unless you want to clean / scrub your instances.  If so, set to "clean"
-- Set permissions for cmd.sh to 700
-- Execute:  ./cmd rkeUpdate
+- Set permissions for rke.sh to 700
+- Execute:  ./rke update
     - If this is a fresh install, RKE runner will detect this and install Ramcher 2.0
     - If this is a previous install, RKE runner will also detect this and then execute:
         - Backup
         - Restore
         - Update
+- To clean and start over 
+    - Rename env.clean.json.dist to env.clean.json and fill in values
+    - execute: ./rke clean
