@@ -6,7 +6,7 @@ phases:
       - echo Build started on `date`
       - yum install -y zip python3-pip python3 python3-setuptools
       - curl -qL -o jq https://stedolan.github.io/jq/download/linux64/jq && chmod +x ./jq
-      - pip3 install -y awscli
+      - pip3 install awscli
       - aws --version
       - curl -qL -o aws_credentials.json http://169.254.170.2/$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI > aws_credentials.json
       - aws configure set region $AWS_REGION
