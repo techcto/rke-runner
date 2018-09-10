@@ -18,12 +18,6 @@ rkeetcd = rkeetcd.RkeEtcd()
 s3 = boto3.resource('s3')
 s3Client = boto3.client('s3')
 
-try:
-    if os.environ['Status'] == "clean":
-        print("Time to clean")
-except IndexError:
-    os.environ['Status'] = ""  
-
 def run(event, context):
     print("Run App")
     print(event)
