@@ -18,5 +18,5 @@ phases:
       - pip install paramiko -t .
       # - zip -r rke-runner.zip .
       # - aws s3 cp rke-runner.zip s3://rancher-aws/rke/rke-runner.zip --force
-      - python -c 'import app; print app.run()'
+      - python-lambda-local -l ~/.local/lib/ -f run -t 3500 app.py event.json
       - echo Build completed on `date`
