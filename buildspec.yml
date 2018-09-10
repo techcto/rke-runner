@@ -15,8 +15,9 @@ phases:
       - aws configure set aws_access_key_id `./jq -r '.AccessKeyId' aws_credentials.json`
       - aws configure set aws_secret_access_key `./jq -r '.SecretAccessKey' aws_credentials.json`
       - aws configure set aws_session_token `./jq -r '.Token' aws_credentials.json`
-      - pip3 install boto3 paramiko -t .
+      - pip install boto3 paramiko -t .
       # - zip -r rke-runner.zip .
       # - aws s3 cp rke-runner.zip s3://rancher-aws/rke/rke-runner.zip --force
-      - python3 run.py
+      - python --version
+      - python run.py
       - echo Build completed on `date`
