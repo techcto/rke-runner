@@ -8,7 +8,7 @@ phases:
       - curl -qL -o jq https://stedolan.github.io/jq/download/linux64/jq && chmod +x ./jq
       - curl -O https://bootstrap.pypa.io/get-pip.py
       - python get-pip.py
-      - pip install awscli boto3 python-lambda-local
+      - pip install awscli boto3
       - aws --version
       - curl -qL -o aws_credentials.json http://169.254.170.2/$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI > aws_credentials.json
       - aws configure set region $AWS_REGION
@@ -18,5 +18,5 @@ phases:
       - pip install paramiko -t .
       # - zip -r rke-runner.zip .
       # - aws s3 cp rke-runner.zip s3://rancher-aws/rke/rke-runner.zip --force
-      - python-lambda-local -l ~/.local/lib/ -f run -t 3500 app.py event.json
+      - python run.py
       - echo Build completed on `date`
