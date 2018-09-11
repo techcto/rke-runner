@@ -21,7 +21,7 @@ class AwsAsg:
             if response:
                 return response
         except BaseException as e:
-            #print(str(e))
+            print(str(e))
             print("Finish manual run.  This is not a Lifecycle event.")
 
     def check_instance_status(self):
@@ -92,7 +92,7 @@ class AwsAsg:
                     if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
                         runStatus = "backup"
                     elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
-                        runStatus = "retry"
+                        runStatus = "run"
                     else:
                         runStatus = "run"
         elif eventStatus == "TEST":
