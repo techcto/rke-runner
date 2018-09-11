@@ -1,5 +1,4 @@
 import boto3,os,subprocess,base64
-import lambdautils
 import rke
 
 rke = rke.Rke()
