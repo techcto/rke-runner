@@ -102,9 +102,7 @@ def restore(env, asg):
         print("Restart Kubernetes")
         rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
         print("Call Update Function via SNS")
-        status = awslambda.publish_sns_message("update")
-        if status == False:
-            update(env, asg)
+        update(env, asg)
 
 def exit(env, asg):
     print("Complete Lifecycle")
