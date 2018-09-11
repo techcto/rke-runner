@@ -82,16 +82,16 @@ class LambdaUtils:
         return True
 
     def execute_cmd(self, host, username, commands):
+        c = paramiko.SSHClient()
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
         print("Connecting to " + host)
-        password = ""
-        transport = paramiko.Transport((host, 22))
-        transport.connect(None, username, password, self.key )
+        c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
-        ssh = paramiko.SSHClient.from_transport(transport)
 
         for command in commands:
             print("Executing {}".format(command))
-            stdin, stdout, stderr = ssh.exec_command(command)
+            stdin, stdout, stderr = c.exec_command(command)
             output = stdout.read()
             if output:
                 print(output.decode("utf-8"))
