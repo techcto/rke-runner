@@ -46,7 +46,7 @@ def init():
     if rkeStatus == True:
         print("Download RKE generated configs")
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
-        s3Client.download_file(env['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
+        s3Client.download_file(os.environ['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
         return "Update"
 
 def dispatcher(env, asg, rkeStatus):
