@@ -19,8 +19,6 @@ s3 = boto3.resource('s3')
 s3Client = boto3.client('s3')
 
 def run(event, context):
-    event = json.loads(event)
-    context = json.loads(context)
 
     print("Run App")
     print(event)
