@@ -54,7 +54,13 @@ def init():
         return "Install"
 
 def dispatcher(env, asg, rkeStatus):
-    if os.environ['Status'] == "clean":
+    if asg.status == "exit":
+        exit(env, asg)
+    elif asg.status == "retry":
+        retry(env, asg)
+    elif asg.status == "backup":
+        backup(env, asg)
+    elif os.environ['Status'] == "clean":
         rke.rkeDown(asg.activeInstances, env['InstanceUser'])
     elif (rkeStatus == "Update") or (asg.snsSubject == "update"):
         backup(env, asg)
