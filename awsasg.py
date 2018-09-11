@@ -21,7 +21,8 @@ class AwsAsg:
             if response:
                 return response
         except BaseException as e:
-            print(str(e))
+            #print(str(e))
+            print("Finish manual run.  This is not a Lifecycle event.")
 
     def check_instance_status(self):
         #Get all instances for an ASG
