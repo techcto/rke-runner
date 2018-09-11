@@ -11,6 +11,7 @@ class RkeEtcd:
     def __init__(self):
         print("Init ETCDRKE Class")
         self.lambdautils = lambdautils.LambdaUtils()
+        self.lambdautils.init()
         self.s3Client = boto3.client('s3')
 
     def takeSnapshot(self, instances, username, bucket):
@@ -44,20 +45,11 @@ class RkeEtcd:
 
     def uploadSnapshot(self, instances, username):
         for instance in instances:
-            # print("Bug fix: etcd-restore not happy")
-            # try:
-            #     commands = [
-            #         'rm -Rf /opt/rke/etcd-snapshots-restore',
-            #         'docker rm etcd-restore'
-            #     ]
-            #     self.lambdautils.execute_cmd(instance['PublicIpAddress'], username, commands)
-            # except BaseException as e:
-            #     print(str(e))
-
             print("Upload etcdbackup to each instance")
             try:
                 self.lambdautils.upload_file(instance['PublicIpAddress'], username, '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
             except BaseException as e:
+                print ("Error: We were unable to upload the backup")
                 print(str(e))
                 return False
         return True
