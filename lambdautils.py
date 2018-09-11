@@ -51,7 +51,6 @@ class LambdaUtils:
         print("Connecting to " + host)
         transport = paramiko.Transport((host, 22))
         transport.auth_publickey(username, self.key)
-        transport.open_session()
         print("Connected to " + host)
         sftp = paramiko.SFTPClient().from_transport(transport)
         sftp.get(downloadFrom, downloadTo)
