@@ -12,7 +12,7 @@ awsasg = awsasg.AwsAsg(os.environ['Cluster'])
 awss3 = awss3.AwsS3()
 awslambda = awslambda.AwsLambda(awsasg)
 lambdautils = lambdautils.LambdaUtils()
-rke = rke.Rke()
+rke = rke.Rke(lambdautils)
 rkeetcd = rkeetcd.RkeEtcd(lambdautils)
 
 s3 = boto3.resource('s3')

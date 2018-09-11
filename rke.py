@@ -6,9 +6,9 @@ from subprocess import Popen,PIPE
 BIN_DIR = '/tmp/bin'
 
 class Rke:
-    def __init__(self):
+    def __init__(self, lambdautils):
         print("Init RKE Class")
-        self.lambdautils = lambdautils.LambdaUtils()
+        self.lambdautils = lambdautils
         self.s3Client = boto3.client('s3')
         self.s3 = boto3.resource('s3')
 
@@ -106,7 +106,7 @@ class Rke:
                 '\n'
                 'nodes:\n')
 
-        instanceCount = 0;
+        instanceCount = 0
         for instance in asgInstances:
             role = 'etcd,controlplane,worker'
             instanceCount += 1
