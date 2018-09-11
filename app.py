@@ -37,7 +37,7 @@ def run(event, context):
     rkeStatus = init()
 
     #Run Application
-    dispatcher(os.environ, awsasg, rkeStatus);
+    dispatcher(os.environ, awsasg, rkeStatus)
 
     return True
 
