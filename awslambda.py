@@ -14,11 +14,10 @@ class AwsLambda:
 
     def publish_sns_message(self, subject):
         try:
-            response = self.snsClient.publish(TopicArn=self.asg.snsTopicArn,Message=json.dumps(self.asg.snsMessage),Subject=subject)
+            self.snsClient.publish(TopicArn=self.asg.snsTopicArn,Message=json.dumps(self.asg.snsMessage),Subject=subject)
             return True
         except Exception as e:
-            print("SNS message not supported.")
-            # print(str(e))
+            print("SNS message not supported:" + str(e))
             responseData['status'] = "success"
             try:
                 print("Tell Cloudformation we are good!")

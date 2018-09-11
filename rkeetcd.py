@@ -48,8 +48,7 @@ class RkeEtcd:
             try:
                 self.lambdautils.upload_file(instance['PublicIpAddress'], username, '/tmp/etcdsnapshot', '/opt/rke/etcd-snapshots/etcdsnapshot')
             except BaseException as e:
-                print ("Error: We were unable to upload the backup")
-                print(str(e))
+                print ("Error: We were unable to upload the backup" + str(e))
                 return False
         return True
 
