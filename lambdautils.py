@@ -79,6 +79,7 @@ class LambdaUtils:
             'ls -al ' + downloadTo
         ]
         self.execute_cmd(host, username, commands)
+        print("Disconnect from " + host)
         return True
 
     def execute_cmd(self, host, username, commands):
