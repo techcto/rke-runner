@@ -24,7 +24,7 @@ class AwsLambda:
                 print("Tell Cloudformation we are good!")
                 self.send_response(self.asg.event, self.asg.context, SUCCESS, responseData)
             except BaseException as e:
-                # print(str(e))
+                return False
             return False
 
     def send_response(self, event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
