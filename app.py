@@ -13,7 +13,7 @@ awss3 = awss3.AwsS3()
 awslambda = awslambda.AwsLambda(awsasg)
 lambdautils = lambdautils.LambdaUtils()
 rke = rke.Rke()
-rkeetcd = rkeetcd.RkeEtcd()
+rkeetcd = rkeetcd.RkeEtcd(lambdautils)
 
 s3 = boto3.resource('s3')
 s3Client = boto3.client('s3')

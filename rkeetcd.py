@@ -8,10 +8,9 @@ s3Client = boto3.client('s3')
 BIN_DIR = '/tmp/bin'
 
 class RkeEtcd:
-    def __init__(self):
+    def __init__(self, lambdautils):
         print("Init ETCDRKE Class")
-        self.lambdautils = lambdautils.LambdaUtils()
-        self.lambdautils.init()
+        self.lambdautils = lambdautils
         self.s3Client = boto3.client('s3')
 
     def takeSnapshot(self, instances, username, bucket):

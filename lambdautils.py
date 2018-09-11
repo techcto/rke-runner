@@ -8,7 +8,7 @@ BIN_DIR = '/tmp/bin'
 OPENSSL = '/usr/bin/openssl'
 
 class LambdaUtils:
-    def init(self):
+    def __init__(self):
         print("Init LambdaUtils Class")
         self.s3Client = boto3.resource('s3')
         print("Downloading RSA key from " + os.environ['Bucket'])
