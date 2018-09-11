@@ -59,16 +59,17 @@ class LambdaUtils:
 
     def upload_file(self, host, username, downloadFrom, downloadTo):
         print("Connecting to " + host)
-        c = paramiko.SFTPClient()
-        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect( hostname = host, username = username, pkey = self.key )
+        password = ""
+        transport = paramiko.Transport((host, 22))
+        transport.connect(None, username, password, self.key )
         print("Connected to " + host)
+        sftp = paramiko.SFTPClient.from_transport(transport)
 
         #Upload file to homr dir
         tmpFilename = time.strftime("%Y%m%d-%H%M%S")
         downloadToTmp = "/home/" + username + "/" + tmpFilename
         print("Upload from " + downloadFrom + " to " + downloadToTmp)
-        c.put(downloadFrom, downloadToTmp)
+        sftp.put(downloadFrom, downloadToTmp)
 
         #Clean out old file and replace with new file
         commands = [

@@ -45,17 +45,18 @@ def init():
     rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
     if rkeStatus == True:
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
+        return "Update"
     else:
         print("Generate certificates")
         rkeCrts = rke.generateCertificates()
         print("Generate Kubernetes Cluster RKE config with all active instances")
         rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
-    return rkeStatus
+        return "Install"
 
 def dispatcher(env, asg, rkeStatus):
     if os.environ['Status'] == "clean":
         rke.rkeDown(asg.activeInstances, env['InstanceUser'])
-    elif (rkeStatus == True) or (asg.snsSubject == "update"):
+    elif (rkeStatus == "Update") or (asg.snsSubject == "update"):
         backup(env, asg)
         uploadRestoreSnapshot(env, asg)
     elif asg.status == "backup":
@@ -91,7 +92,6 @@ def update(env, asg):
 def backup(env, asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
-    exit(env, asg)
 
 def uploadRestoreSnapshot(env, asg):
     print("Upload latest snapshot to all instances")
