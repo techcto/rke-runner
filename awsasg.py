@@ -82,6 +82,7 @@ class AwsAsg:
                 self.snsEvent=snsMessage['Event']
                 
                 if self.snsEvent == "autoscaling:TEST_NOTIFICATION":
+                    print("Ignore: this is a test event")
                     runStatus = "exit"
                 else:
                     self.lifecycleHookName=snsMessage['LifecycleHookName']

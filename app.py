@@ -46,12 +46,6 @@ def init():
     if rkeStatus == True:
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
         return "Update"
-    else:
-        print("Generate certificates")
-        rkeCrts = rke.generateCertificates()
-        print("Generate Kubernetes Cluster RKE config with all active instances")
-        rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
-        return "Install"
 
 def dispatcher(env, asg, rkeStatus):
     if asg.status == "exit":
@@ -71,6 +65,10 @@ def dispatcher(env, asg, rkeStatus):
     return True
 
 def install(env, asg):
+    print("Generate certificates")
+    rkeCrts = rke.generateCertificates()
+    print("Generate Kubernetes Cluster RKE config with all active instances")
+    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Install Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
