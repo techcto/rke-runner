@@ -50,6 +50,7 @@ class LambdaUtils:
     def download_file(self, host, username, downloadFrom, downloadTo):
         print("Connecting to " + host)
         c = paramiko.SFTPClient()
+        print("test")
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         c.connect( hostname = host, username = username, pkey = self.key )
         print("Connected to " + host)
