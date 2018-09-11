@@ -70,8 +70,6 @@ def install(env, asg):
     print("Upload RKE generated configs")
     s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
-    print("Complete Lifecycle")
-    asg.complete_lifecycle_action('CONTINUE')
     exit(env, asg)
     
 def update(env, asg):
