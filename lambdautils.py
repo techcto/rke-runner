@@ -50,15 +50,11 @@ class LambdaUtils:
     def download_file(self, host, username, downloadFrom, downloadTo):
         print("Connecting to " + host)
         transport = paramiko.Transport((host, 22))
-        transport.connect( hostname = host, username = username, pkey = self.key )
+        transport.connect(self.key, username)
         print("Connected to " + host)
         sftp = paramiko.SFTPClient().from_transport(transport)
         sftp.get(downloadFrom, downloadTo)
-
-        return
-        {
-            'message' : "Script execution completed. See Cloudwatch logs for complete output"
-        }
+        return True
 
     def upload_file(self, host, username, downloadFrom, downloadTo):
         print("Connecting to " + host)
@@ -80,11 +76,7 @@ class LambdaUtils:
             'ls -al ' + downloadTo
         ]
         self.execute_cmd(host, username, commands)
-
-        return
-        {
-            'message' : "Script execution completed. See Cloudwatch logs for complete output"
-        }
+        return True
 
     def execute_cmd(self, host, username, commands):
         c = paramiko.SSHClient()
@@ -103,8 +95,5 @@ class LambdaUtils:
             errors = stderr.read()
             if errors:
                 print(errors.decode("utf-8"))
-
-        return
-        {
-            'message' : "Script execution completed. See Cloudwatch logs for complete output"
-        }
+        
+        return True
