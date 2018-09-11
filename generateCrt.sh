@@ -23,7 +23,7 @@ openssl req \
     -newkey rsa:4096 \
     -days 365 \
     -nodes \
-    -subj "/C=US/ST=Florida/L=Orlando/O=spacemade/OU=org unit/CN=rancher2.spce.io" \
+    -subj "/C=$COUNTRYCODE/ST=$STATE/L=$CITY/O=$ORG/OU=$UNIT/CN=$FQDN" \
     -keyout server.key \
     -out server.csr
 
