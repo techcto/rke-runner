@@ -22,10 +22,10 @@ class RkeEtcd:
                     self.lambdautils.download_file(instance['PublicIpAddress'], username, '/opt/rke/etcd-snapshots/etcdsnapshot', '/tmp/etcdsnapshot')
                     print("Upload snapshot to S3")
                     self.s3Client.upload_file('/tmp/etcdsnapshot', bucket, 'etcdsnapshot')
-                    break
                 except BaseException as e:
                     print(str(e))
             return True
+            
         except BaseException as e:
             print(str(e))
             print("ETCD backup failed.  Most likely this is a new cluster or a new instance was added and cannot be healed")
