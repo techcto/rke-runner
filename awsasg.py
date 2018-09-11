@@ -53,6 +53,8 @@ class AwsAsg:
                     elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
                         print("We have a new instance.  Welcome!")
                         self.newInstances.append(instance)
+                    else:
+                        print("This instance is bad, we will ignore.")
 
     def check_event_status(self, event, context):
         print("Test Event for type")

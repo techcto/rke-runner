@@ -44,7 +44,9 @@ def run(event, context):
 def init():
     rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
     if rkeStatus == True:
+        print("Download RKE generated configs")
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
+        s3Client.download_file(env['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
         return "Update"
 
 def dispatcher(env, asg, rkeStatus):
@@ -77,8 +79,6 @@ def install(env, asg):
     exit(env, asg)
     
 def update(env, asg):
-    print("Download RKE generated config")
-    s3Client.download_file(env['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
     print("Update Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
@@ -95,6 +95,9 @@ def uploadRestoreSnapshot(env, asg):
     rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
     
 def restore(env, asg):
+    print("Generate Kubernetes Cluster RKE config with all active instances")
+    rkeCrts = rke.generateCertificates()
+    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Restore instances with latest snapshot")
     restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
     if restoreStatus == False:
