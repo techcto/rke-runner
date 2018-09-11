@@ -18,13 +18,13 @@ class AwsLambda:
             return True
         except Exception as e:
             print("SNS message not supported.")
-            print(str(e))
+            # print(str(e))
             responseData['status'] = "success"
             try:
                 print("Tell Cloudformation we are good!")
                 self.send_response(self.asg.event, self.asg.context, SUCCESS, responseData)
             except BaseException as e:
-                print(str(e))
+                # print(str(e))
             return False
 
     def send_response(self, event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
