@@ -13,5 +13,8 @@ phases:
       - aws configure set aws_session_token `./jq -r '.Token' aws_credentials.json`
       - pip3 install boto3 paramiko -t .
       - python3 --version
-      - python3 run.py
+      - python3 run.py 2>&1 | tee rke.log
       - echo Build completed on `date`
+artifacts:
+  files:
+    - rke.log
