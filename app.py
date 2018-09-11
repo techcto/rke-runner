@@ -59,12 +59,7 @@ def dispatcher(env, asg, rkeStatus):
     elif (rkeStatus == "Update") or (asg.snsSubject == "update"):
         backup(env, asg)
         uploadRestoreSnapshot(env, asg)
-    elif asg.status == "backup":
-        backup(env, asg)
-    elif asg.status == "exit":
-        exit(env, asg)
-    elif asg.status == "retry":
-        retry(env, asg)
+        restore(env, asg)
     else:
         install(env, asg)
     return True
@@ -96,10 +91,6 @@ def backup(env, asg):
 def uploadRestoreSnapshot(env, asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
-    print("Call Update Function via SNS")
-    status = awslambda.publish_sns_message("restore")
-    if status == False:
-        restore(env, asg)
     
 def restore(env, asg):
     print("Restore instances with latest snapshot")
