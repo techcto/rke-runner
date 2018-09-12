@@ -36,6 +36,11 @@ def run(event, context):
     #Check ASG instances to see what is going on
     awsasg.check_instance_status()
 
+    #Generate RKE config
+    print("Generate Kubernetes Cluster RKE config with all active instances")
+    rkeCrts = rke.generateCertificates()
+    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
+
     #Run Application
     dispatcher(awsasg)
 
@@ -67,10 +72,6 @@ def dispatcher(asg):
     return True
 
 def install(asg):
-    print("Generate certificates")
-    rkeCrts = rke.generateCertificates()
-    print("Generate Kubernetes Cluster RKE config with all active instances")
-    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Install Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
@@ -79,9 +80,6 @@ def install(asg):
     exit(asg)
     
 def update(asg):
-    print("Generate Kubernetes Cluster RKE config with all active instances")
-    rkeCrts = rke.generateCertificates()
-    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Update Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
@@ -92,9 +90,6 @@ def update(asg):
 def heal(asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, os.environ['InstanceUser'])
-    print("Generate Kubernetes Cluster RKE config with all active instances")
-    rkeCrts = rke.generateCertificates()
-    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Restore instances with latest snapshot")
     restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, os.environ['Bucket'])
     if restoreStatus == False:
