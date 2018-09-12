@@ -48,7 +48,7 @@ def init(awsasg):
         awsasg.status = "update"
 
 def dispatcher(env, asg):
-    if env.status == "clean":
+    if env.Status == "clean":
         clean(env, asg)
     elif asg.status == "exit":
         exit(env, asg)
