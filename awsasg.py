@@ -59,7 +59,6 @@ class AwsAsg:
         print("Test Event for type")
         self.event = event
         self.context = context
-        eventStatus = ""
 
         try:
             print("Test if this was called from an ASG lifecycle event or SNS message")
@@ -86,19 +85,17 @@ class AwsAsg:
                 
                 if self.snsEvent == "autoscaling:TEST_NOTIFICATION":
                     print("Ignore: this is a test event")
-                    runStatus = "exit"
+                    self.status = "exit"
                 else:
                     self.lifecycleHookName=snsMessage['LifecycleHookName']
                     self.lifecycleActionToken=snsMessage['LifecycleActionToken']
                     self.lifecycleTransition=snsMessage['LifecycleTransition']
 
                     if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
-                        runStatus = "backup"
+                        self.status = "backup"
                     elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
-                        runStatus = "heal"
+                        self.status = "heal"
                     else:
-                        runStatus = "update"
+                        self.status = "update"
         else:
-            runStatus = "install"
-
-        self.status = runStatus;
+            self.status = "install"
