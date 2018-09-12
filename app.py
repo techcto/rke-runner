@@ -73,7 +73,7 @@ def install(asg):
     rke.rkeUp()
     print("Upload RKE generated configs")
     s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
-    s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
+    s3Client.upload_file('/tmp/kube_config_config.yaml', os.environ['Bucket'], 'kube_config_config.yaml')
     exit(asg)
     
 def update(asg):
@@ -81,17 +81,17 @@ def update(asg):
     rke.rkeUp()
     print("Upload RKE generated configs")
     s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
-    s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
+    s3Client.upload_file('/tmp/kube_config_config.yaml', os.environ['Bucket'], 'kube_config_config.yaml')
     exit(asg)
     
 def restore(asg):
     print("Upload latest snapshot to all instances")
-    rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
+    rkeetcd.uploadSnapshot(asg.activeInstances, os.environ['InstanceUser'])
     print("Generate Kubernetes Cluster RKE config with all active instances")
     rkeCrts = rke.generateCertificates()
     rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Restore instances with latest snapshot")
-    restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, env['Bucket'])
+    restoreStatus = rkeetcd.restoreSnapshot(asg.activeInstances, os.environ['Bucket'])
     if restoreStatus == False:
         print("Restore failed!")
         print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
@@ -99,12 +99,12 @@ def restore(asg):
         exit(asg)
     else:
         print("Restart Kubernetes")
-        rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
+        rke.restartKubernetes(asg.activeInstances, os.environ['InstanceUser'])
         update(asg)
 
 def backup(asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
-    rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
+    rkeetcd.takeSnapshot(asg.activeInstances, os.environ['InstanceUser'], os.environ['Bucket'])
 
 def retry(asg):
     time.sleep(60)
@@ -118,4 +118,4 @@ def exit(asg):
 
 def clean(asg):
     print("Clean the instances and start over.")
-    rke.rkeDown(asg.activeInstances, env['InstanceUser'])
+    rke.rkeDown(asg.activeInstances, os.environ['InstanceUser'])
