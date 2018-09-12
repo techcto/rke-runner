@@ -61,7 +61,8 @@ class AwsAsg:
                     self.lifecycleTransition=snsMessage['LifecycleTransition']
 
                     if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
-                        self.status = "backup"
+                        # self.status = "backup"
+                        self.status = "exit"
                     elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
                         self.status = "heal"
                     else:

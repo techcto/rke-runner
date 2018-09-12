@@ -58,6 +58,7 @@ def dispatcher(asg):
         backup(asg)
         exit(asg)
     elif (asg.status == "heal" or os.environ['Status'] == "heal"):
+        backup(asg)
         heal(asg)
     elif (asg.status == "update" or os.environ['Status'] == "update"):
         update(asg)
