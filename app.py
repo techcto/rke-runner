@@ -48,7 +48,9 @@ def init(awsasg):
         awsasg.status = "update"
 
 def dispatcher(env, asg):
-    if asg.status == "exit":
+    if env.status == "clean":
+        clean(env, asg)
+    elif asg.status == "exit":
         exit(env, asg)
     elif asg.status == "retry":
         retry(env, asg)
@@ -113,3 +115,7 @@ def exit(env, asg):
     print("Complete Lifecycle")
     asg.complete_lifecycle_action('CONTINUE')
     return True
+
+def clean(env, asg):
+    print("Clean the instances and start over.")
+    rke.rkeDown(asg.activeInstances, env['InstanceUser'])
