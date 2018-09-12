@@ -23,42 +23,11 @@ class AwsAsg:
         except BaseException as e:
             print("Finish manual run.  This is not a Lifecycle event: " + str(e))
 
-    def check_instance_status(self):
-        #Get all instances for an ASG
-        filters = [{  
-            'Name': 'tag:aws:autoscaling:groupName',
-            'Values': [self.cluster]
-        }]
-
-        print("Print instances in autoscaling group")
-        for reservation in self.ec2Client.describe_instances(Filters=filters)['Reservations']:
-            # print(reservation['Instances'])
-
-            for instance in reservation['Instances']:
-                #Check to see if instance is healthy
-                response = self.autoscalingClient.describe_auto_scaling_instances(
-                    InstanceIds=[
-                        instance['InstanceId']
-                    ]
-                )
-
-                for asgInstance in response['AutoScalingInstances']:
-                    #Pretty print json of instance from AWS autoscaling group
-                    print(json.dumps(asgInstance, indent=4, sort_keys=True))
-
-                    if (asgInstance['LifecycleState'] == 'InService'):   
-                        print("This instance is good to go!")
-                        self.activeInstances.append(instance)
-                    elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
-                        print("We have a new instance.  Welcome!")
-                        self.newInstances.append(instance)
-                    else:
-                        print("This instance is bad, we will ignore.")
-
     def check_event_status(self, event, context):
         print("Test Event for type")
         self.event = event
         self.context = context
+        eventStatus = ""
 
         try:
             print("Test if this was called from an ASG lifecycle event or SNS message")
@@ -99,3 +68,37 @@ class AwsAsg:
                         self.status = "update"
         else:
             self.status = "install"
+
+    def check_instance_status(self):
+            #Get all instances for an ASG
+        filters = [{  
+            'Name': 'tag:aws:autoscaling:groupName',
+            'Values': [self.cluster]
+        }]
+
+        print("Print instances in autoscaling group")
+        for reservation in self.ec2Client.describe_instances(Filters=filters)['Reservations']:
+            # print(reservation['Instances'])
+
+            for instance in reservation['Instances']:
+                #Check to see if instance is healthy
+                response = self.autoscalingClient.describe_auto_scaling_instances(
+                    InstanceIds=[
+                        instance['InstanceId']
+                    ]
+                )
+
+                for asgInstance in response['AutoScalingInstances']:
+                    #Pretty print json of instance from AWS autoscaling group
+                    print(json.dumps(asgInstance, indent=4, sort_keys=True))
+
+                    if (asgInstance['LifecycleState'] == 'InService'):   
+                        print("This instance is good to go!")
+                        self.activeInstances.append(instance)
+                    elif (asgInstance['LifecycleState'] == 'Pending') or (asgInstance['LifecycleState'] == 'Pending:Wait') or (asgInstance['LifecycleState'] == 'Pending:Proceed'):
+                        print("We have a new instance.  Welcome!")
+                        self.newInstances.append(instance)
+                        self.activeInstances.append(instance)
+                        self.status = "heal"
+                    else:
+                        print("This instance is bad, we will ignore.")

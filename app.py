@@ -48,7 +48,6 @@ def init(awsasg):
         awsasg.status = "update"
 
 def dispatcher(asg):
-    #Note: We only listen for clean for os.environ['Status'] 
     if os.environ['Status'] == "clean":
         clean(asg)
     elif asg.status == "exit":
@@ -58,9 +57,9 @@ def dispatcher(asg):
     elif asg.status == "backup":
         backup(asg)
         exit(asg)
-    elif asg.status == "heal":
+    elif (asg.status == "heal" or os.environ['Status'] == "heal"):
         heal(asg)
-    elif asg.status == "update":
+    elif (asg.status == "update" or os.environ['Status'] == "update"):
         update(asg)
     else:
         install(asg)
@@ -79,6 +78,9 @@ def install(asg):
     exit(asg)
     
 def update(asg):
+    print("Generate Kubernetes Cluster RKE config with all active instances")
+    rkeCrts = rke.generateCertificates()
+    rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
     print("Update Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
