@@ -47,24 +47,24 @@ def init(awsasg):
         s3Client.download_file(os.environ['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
         awsasg.status = "update"
 
-def dispatcher(env, asg):
-    if env.Status == "clean":
-        clean(env, asg)
+def dispatcher(asg):
+    if os.environ['Status'] == "clean":
+        clean(asg)
     elif asg.status == "exit":
-        exit(env, asg)
+        exit(asg)
     elif asg.status == "retry":
-        retry(env, asg)
+        retry(asg)
     elif asg.status == "backup":
-        backup(env, asg)
+        backup(asg)
     elif asg.status == "restore":
-        restore(env, asg)
+        restore(asg)
     elif asg.status == "update":
-        update(env, asg)
+        update(asg)
     else:
-        install(env, asg)
+        install(asg)
     return True
 
-def install(env, asg):
+def install(asg):
     print("Generate certificates")
     rkeCrts = rke.generateCertificates()
     print("Generate Kubernetes Cluster RKE config with all active instances")
@@ -74,17 +74,17 @@ def install(env, asg):
     print("Upload RKE generated configs")
     s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
-    exit(env, asg)
+    exit(asg)
     
-def update(env, asg):
+def update(asg):
     print("Update Kubernetes via RKE")
     rke.rkeUp()
     print("Upload RKE generated configs")
     s3Client.upload_file('/tmp/config.yaml', os.environ['Bucket'], 'config.yaml')
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
-    exit(env, asg)
+    exit(asg)
     
-def restore(env, asg):
+def restore(asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
     print("Generate Kubernetes Cluster RKE config with all active instances")
@@ -96,26 +96,26 @@ def restore(env, asg):
         print("Restore failed!")
         print("We are going to halt the execution of this script, as running update after a failed restore will wipe your cluster!")
         print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
-        exit(env, asg)
+        exit(asg)
     else:
         print("Restart Kubernetes")
         rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
-        update(env, asg)
+        update(asg)
 
-def backup(env, asg):
+def backup(asg):
     print("Take snapshot from running healthy instaces and upload externally to S3")
     rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
 
-def retry(env, asg):
+def retry(asg):
     time.sleep(60)
-    dispatcher(env, asg)
+    dispatcher(asg)
     return True
 
-def exit(env, asg):
+def exit(asg):
     print("Complete Lifecycle")
     asg.complete_lifecycle_action('CONTINUE')
     return True
 
-def clean(env, asg):
+def clean(asg):
     print("Clean the instances and start over.")
     rke.rkeDown(asg.activeInstances, env['InstanceUser'])
