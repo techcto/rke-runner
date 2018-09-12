@@ -6,7 +6,7 @@ class AwsAsg:
         self.cluster = cluster
         self.activeInstances = []
         self.newInstances = []
-        self.status = "run"
+        self.status = ""
         self.snsTopicArn = ""
         self.snsSubject = ""
         self.snsMessage = ""
@@ -60,7 +60,6 @@ class AwsAsg:
         print("Test Event for type")
         self.event = event
         self.context = context
-        eventStatus = "TEST"
 
         try:
             snsTopicArn=event['Records'][0]['Sns']['TopicArn']
@@ -74,7 +73,6 @@ class AwsAsg:
         except BaseException as e:
             print(str(e))
 
-        runStatus = "exit"
         if (eventStatus == "SNS") or (eventStatus == "ASG"):
             self.snsTopicArn=event['Records'][0]['Sns']['TopicArn']
             self.snsSubject=event['Records'][0]['Sns']['Subject']
@@ -94,10 +92,10 @@ class AwsAsg:
                     if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
                         runStatus = "backup"
                     elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
-                        runStatus = "run"
+                        runStatus = "update"
                     else:
-                        runStatus = "run"
-        elif eventStatus == "TEST":
-            runStatus = "run"
+                        runStatus = "update"
+        else:
+            runStatus = "install"
 
         self.status = runStatus;

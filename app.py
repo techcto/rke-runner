@@ -30,38 +30,34 @@ def run(event, context):
     #Set Event Status
     awsasg.check_event_status(event, context)
 
-    #Set ASG Status
+    #Check is this is a new or existing rke cluster
+    init(awsasg)
+
+    #Check ASG instances to see what is going on
     awsasg.check_instance_status()
 
-    #Check RKE Status
-    rkeStatus = init()
-
     #Run Application
-    dispatcher(os.environ, awsasg, rkeStatus)
+    dispatcher(os.environ, awsasg)
 
-    return True
-
-def init():
-    rkeStatus = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
-    if rkeStatus == True:
+def init(awsasg):
+    status = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
+    if status == True:
         print("Download RKE generated configs")
         s3Client.download_file(os.environ['Bucket'], 'config.yaml', '/tmp/config.yaml')
         s3Client.download_file(os.environ['Bucket'], 'kube_config_config.yaml', '/tmp/kube_config_config.yaml')
-        return "Update"
+        awsasg.status = "update"
 
-def dispatcher(env, asg, rkeStatus):
+def dispatcher(env, asg):
     if asg.status == "exit":
         exit(env, asg)
     elif asg.status == "retry":
         retry(env, asg)
     elif asg.status == "backup":
         backup(env, asg)
-    elif os.environ['Status'] == "clean":
-        rke.rkeDown(asg.activeInstances, env['InstanceUser'])
-    elif (rkeStatus == "Update") or (asg.snsSubject == "update"):
-        backup(env, asg)
-        uploadRestoreSnapshot(env, asg)
+    elif asg.status == "restore":
         restore(env, asg)
+    elif asg.status == "update":
+        update(env, asg)
     else:
         install(env, asg)
     return True
@@ -86,15 +82,9 @@ def update(env, asg):
     s3Client.upload_file('/tmp/kube_config_config.yaml', env['Bucket'], 'kube_config_config.yaml')
     exit(env, asg)
     
-def backup(env, asg):
-    print("Take snapshot from running healthy instaces and upload externally to S3")
-    rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
-
-def uploadRestoreSnapshot(env, asg):
+def restore(env, asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, env['InstanceUser'])
-    
-def restore(env, asg):
     print("Generate Kubernetes Cluster RKE config with all active instances")
     rkeCrts = rke.generateCertificates()
     rke.generateRKEConfig(awsasg.activeInstances, os.environ['InstanceUser'], os.environ['instancePEM'], os.environ['FQDN'], rkeCrts)
@@ -110,12 +100,16 @@ def restore(env, asg):
         rke.restartKubernetes(asg.activeInstances, env['InstanceUser'])
         update(env, asg)
 
-def exit(env, asg):
-    print("Complete Lifecycle")
-    asg.complete_lifecycle_action('CONTINUE')
-    return True
+def backup(env, asg):
+    print("Take snapshot from running healthy instaces and upload externally to S3")
+    rkeetcd.takeSnapshot(asg.activeInstances, env['InstanceUser'], env['Bucket'])
 
 def retry(env, asg):
     time.sleep(60)
-    update(env, asg)
+    dispatcher(env, asg)
+    return True
+
+def exit(env, asg):
+    print("Complete Lifecycle")
+    asg.complete_lifecycle_action('CONTINUE')
     return True
