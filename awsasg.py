@@ -60,6 +60,7 @@ class AwsAsg:
         print("Test Event for type")
         self.event = event
         self.context = context
+        eventStatus = ""
 
         try:
             snsTopicArn=event['Records'][0]['Sns']['TopicArn']
