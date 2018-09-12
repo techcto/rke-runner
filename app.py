@@ -98,6 +98,7 @@ def heal(asg):
         print("Restart the Kubernetes components on all cluster nodes to prevent potential future etcd conflicts")
         exit(asg)
     else:
+        ..
         print("Restart Kubernetes")
         rke.restartKubernetes(asg.activeInstances, os.environ['InstanceUser'])
         update(asg)
