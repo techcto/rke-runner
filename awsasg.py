@@ -63,14 +63,17 @@ class AwsAsg:
         eventStatus = ""
 
         try:
-            snsTopicArn=event['Records'][0]['Sns']['TopicArn']
+            print("Test if this was called from an ASG lifecycle event or SNS message")
+            print(event['Records'][0]['Sns']['TopicArn'])
             snsMessage=json.loads(event['Records'][0]['Sns']['Message'])
             try:
-                snsEvent=snsMessage['Event']
-                eventStatus = "ASG"
+                print("Test for ASG event")
+                print(snsMessage['Event'])
+                eventStatus = "ASG"              
             except BaseException as e:
+                print("This is a SNS message")
                 print(str(e))
-            eventStatus = "SNS"
+                eventStatus = "SNS"
         except BaseException as e:
             print(str(e))
 
@@ -93,7 +96,7 @@ class AwsAsg:
                     if self.lifecycleTransition == "autoscaling:EC2_INSTANCE_TERMINATING":
                         runStatus = "backup"
                     elif self.lifecycleTransition == "autoscaling:EC2_INSTANCE_LAUNCHING":
-                        runStatus = "update"
+                        runStatus = "heal"
                     else:
                         runStatus = "update"
         else:

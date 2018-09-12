@@ -48,6 +48,7 @@ def init(awsasg):
         awsasg.status = "update"
 
 def dispatcher(asg):
+    #Note: We only listen for clean for os.environ['Status'] 
     if os.environ['Status'] == "clean":
         clean(asg)
     elif asg.status == "exit":
@@ -56,8 +57,9 @@ def dispatcher(asg):
         retry(asg)
     elif asg.status == "backup":
         backup(asg)
-    elif asg.status == "restore":
-        restore(asg)
+        exit(asg)
+    elif asg.status == "heal":
+        heal(asg)
     elif asg.status == "update":
         update(asg)
     else:
@@ -84,7 +86,7 @@ def update(asg):
     s3Client.upload_file('/tmp/kube_config_config.yaml', os.environ['Bucket'], 'kube_config_config.yaml')
     exit(asg)
     
-def restore(asg):
+def heal(asg):
     print("Upload latest snapshot to all instances")
     rkeetcd.uploadSnapshot(asg.activeInstances, os.environ['InstanceUser'])
     print("Generate Kubernetes Cluster RKE config with all active instances")
