@@ -37,7 +37,7 @@ def run(event, context):
     awsasg.check_instance_status()
 
     #Run Application
-    dispatcher(os.environ, awsasg)
+    dispatcher(awsasg)
 
 def init(awsasg):
     status = awss3.file_exists(os.environ['Bucket'], 'config.yaml')
